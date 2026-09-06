@@ -1,0 +1,31 @@
+{
+  "description": "Shades current browser tab to reduce the brightness",
+  "manifest_version": 3,
+  "name": "TabShade",
+  "version": "1.0",
+  "homepage_url": "https://github.com/mfearby",
+  "icons": {
+    "48": "icons/shader-48.png"
+  },
+  "permissions": ["activeTab", "scripting"],
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "tabshade@marcfearby.com",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
+  },
+  "action": {
+    "default_icon": "icons/shader-32.png",
+    "theme_icons": [
+      {
+        "light": "icons/shader-32-light.png",
+        "dark": "icons/shader-32.png",
+        "size": 32
+      }
+    ],
+    "default_title": "TabShade",
+    "default_popup": "popup/popup.html"
+  }
+}
