@@ -17,13 +17,24 @@ function reportError(error) {
 }
 
 /**
- * Update the slider position to reflect the given shade level.
+ * Update the label text to show the given shade level as a percentage.
+ */
+function setLabelValue(level) {
+    const valueEl = document.querySelector("#shade-level-value");
+    if (valueEl) {
+        valueEl.textContent = `${level}%`;
+    }
+}
+
+/**
+ * Update the slider position and the label to reflect the given shade level.
  */
 function setSliderValue(level) {
     const slider = document.querySelector("#shade-level");
     if (slider) {
         slider.value = String(level);
     }
+    setLabelValue(level);
 }
 
 /**
@@ -55,11 +66,13 @@ function listenForSlider() {
         return;
     }
     slider.addEventListener("input", async (e) => {
+        const level = Number(e.target.value);
+        setLabelValue(level);
         try {
             const tab = await getActiveTab();
             await browser.tabs.sendMessage(tab.id, {
                 command: "setLevel",
-                level: Number(e.target.value),
+                level,
             });
         } catch (error) {
             reportError(error);

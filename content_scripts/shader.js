@@ -107,24 +107,38 @@
     }
 
     /**
-     * Set the shade level for the current page: apply it visually and remember
-     * (or forget) the domain in local storage.
+     * Notify the background script that this tab's shade level changed, so it
+     * can update the badge shown on the toolbar icon.
+     */
+    function notifyLevelChanged(level) {
+        browser.runtime
+            .sendMessage({ command: "levelChanged", level: normalizeLevel(level) })
+            .catch(() => {
+                // No receiver (e.g. background not ready); safe to ignore.
+            });
+    }
+
+    /**
+     * Set the shade level for the current page: apply it visually, remember
+     * (or forget) the domain in local storage, and update the toolbar badge.
      */
     async function setLevel(level) {
         const normalized = normalizeLevel(level);
         applyLevel(normalized);
         await rememberDomain(getDomain(), normalized);
+        notifyLevelChanged(normalized);
     }
 
     /**
      * On load, check whether the current domain has a remembered shade level,
-     * and if so apply it automatically.
+     * apply it if so, and report the level for the toolbar badge.
      */
     async function applyIfRemembered() {
         const level = await getLevelForDomain(getDomain());
         if (level > 0) {
             applyLevel(level);
         }
+        notifyLevelChanged(level);
     }
 
     /**

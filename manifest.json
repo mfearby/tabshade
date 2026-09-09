@@ -8,6 +8,9 @@
     "48": "icons/shader-48.png"
   },
   "permissions": ["activeTab", "scripting", "storage"],
+  "background": {
+    "scripts": ["background/background.js"]
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
