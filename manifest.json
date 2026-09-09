@@ -7,7 +7,14 @@
   "icons": {
     "48": "icons/shader-48.png"
   },
-  "permissions": ["activeTab", "scripting"],
+  "permissions": ["activeTab", "scripting", "storage"],
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["content_scripts/shader.js"],
+      "run_at": "document_idle"
+    }
+  ],
   "browser_specific_settings": {
     "gecko": {
       "id": "tabshade@marcfearby.com",

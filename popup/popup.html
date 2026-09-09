@@ -7,7 +7,15 @@
 
     <body>
         <div id="popup-content">
-            <button id="overlay-toggle">Shade</button>
+            <label id="shade-level-label" for="shade-level">Shade level</label>
+            <input
+                type="range"
+                id="shade-level"
+                min="0"
+                max="100"
+                step="1"
+                value="0"
+            />
         </div>
         <div id="error-content" class="hidden">
             <p>Can't shade this web page.</p>

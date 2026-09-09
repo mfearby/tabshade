@@ -1,33 +1,66 @@
 /**
- * Listen for clicks on the buttons, and send the appropriate message to the content script in the page.
+ * Get the currently active tab in the current window.
  */
-function listenForClicks() {
-    document.addEventListener("click", async (e) => {
-        /**
-         * Log the error to the console.
-         */
-        function reportError(error) {
-            console.error(`Could not apply shader: ${error}`);
-        }
+async function getActiveTab() {
+    const [tab] = await browser.tabs.query({
+        active: true,
+        currentWindow: true,
+    });
+    return tab;
+}
 
-        if (e.target.tagName !== "BUTTON" || !e.target.closest("#popup-content")) {
-            // Ignore when click is not on a button within <div id="popup-content">.
-            return;
-        }
+/**
+ * Log the error to the console.
+ */
+function reportError(error) {
+    console.error(`Could not apply shader: ${error}`);
+}
 
-        /**
-         * Get the active tab,
-         * then call the appropriate method.
-         */
+/**
+ * Update the slider position to reflect the given shade level.
+ */
+function setSliderValue(level) {
+    const slider = document.querySelector("#shade-level");
+    if (slider) {
+        slider.value = String(level);
+    }
+}
+
+/**
+ * Ask the content script for the level currently applied to the page and
+ * update the slider to match.
+ */
+async function syncSliderFromPage(tabId) {
+    try {
+        const response = await browser.tabs.sendMessage(tabId, {
+            command: "getLevel",
+        });
+        if (response && typeof response.level === "number") {
+            // Reflect the level actually applied to the page: 0 when the page
+            // is unshaded, or the remembered level when it is shaded.
+            setSliderValue(response.level);
+        }
+    } catch (error) {
+        reportError(error);
+    }
+}
+
+/**
+ * Listen for changes on the shade level slider and send the new level to the
+ * content script, which applies it and remembers it for the current domain.
+ */
+function listenForSlider() {
+    const slider = document.querySelector("#shade-level");
+    if (!slider) {
+        return;
+    }
+    slider.addEventListener("input", async (e) => {
         try {
-            const [tab] = await browser.tabs.query({
-                active: true,
-                currentWindow: true,
+            const tab = await getActiveTab();
+            await browser.tabs.sendMessage(tab.id, {
+                command: "setLevel",
+                level: Number(e.target.value),
             });
-
-            if (e.target.id === "overlay-toggle") {
-                await browser.tabs.sendMessage(tab.id, { command: "toggleOverlay" });
-            }
         } catch (error) {
             reportError(error);
         }
@@ -45,21 +78,21 @@ function reportExecuteScriptError(error) {
 }
 
 /**
- * When the popup loads, inject a content script into the active tab and add a click handler.
+ * When the popup loads, inject a content script into the active tab, wire up
+ * the controls, and sync the slider to the page's current shade level.
  * If the extension couldn't inject the script, handle the error.
  */
 (async function runOnPopupOpened() {
     try {
-        const [tab] = await browser.tabs.query({
-            active: true,
-            currentWindow: true,
-        });
+        const tab = await getActiveTab();
 
         await browser.scripting.executeScript({
             target: { tabId: tab.id },
             files: ["/content_scripts/shader.js"],
         });
-        listenForClicks();
+
+        listenForSlider();
+        await syncSliderFromPage(tab.id);
     } catch (e) {
         reportExecuteScriptError(e);
     }
