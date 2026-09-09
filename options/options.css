@@ -71,6 +71,18 @@ h1 {
     font-variant-numeric: tabular-nums;
 }
 
+#attribution {
+    margin-top: 20px;
+    padding-top: 12px;
+    border-top: 1px solid #e5e5e5;
+    font-size: 0.85em;
+    color: #777;
+}
+
+#attribution a {
+    color: #5a5a8f;
+}
+
 .hidden {
     display: none;
 }
