@@ -49,6 +49,11 @@ IconBeast Lite license, redistribution is permitted provided the source is
 acknowledged and a link back to IconBeast is included, which this project does
 here.
 
+## Built with Kiro
+
+This extension was built with the help of [Kiro](https://kiro.dev), an
+AI-powered development environment.
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0. See the
