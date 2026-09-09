@@ -155,6 +155,22 @@
     });
 
     /**
+     * React to shade levels being changed elsewhere (e.g. from the preferences
+     * page). If this domain's stored level differs from what is currently
+     * applied, update the page and the toolbar badge to match.
+     */
+    browser.storage.onChanged.addListener(async (changes, area) => {
+        if (area !== "local" || !changes[STORAGE_KEY]) {
+            return;
+        }
+        const stored = await getLevelForDomain(getDomain());
+        if (stored !== getCurrentLevel()) {
+            applyLevel(stored);
+            notifyLevelChanged(stored);
+        }
+    });
+
+    /**
      * Determine the level currently applied to the page based on the overlay's
      * opacity, or 0 if there is no overlay.
      */

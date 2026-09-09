@@ -1,0 +1,76 @@
+body {
+    font-family: sans-serif;
+    font-size: 14px;
+    margin: 16px;
+    min-width: 360px;
+    color: #1a1a1a;
+}
+
+h1 {
+    font-size: 1.3em;
+    margin: 0 0 8px;
+}
+
+#intro {
+    margin: 0 0 16px;
+    color: #555;
+}
+
+#domain-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.domain-row {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    grid-template-areas:
+        "name remove"
+        "control control";
+    align-items: center;
+    gap: 6px 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid #e5e5e5;
+}
+
+.domain-name {
+    grid-area: name;
+    font-weight: 600;
+    word-break: break-all;
+}
+
+.domain-remove {
+    grid-area: remove;
+    border: none;
+    background-color: #f2d9d9;
+    padding: 4px 10px;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.domain-remove:hover {
+    background-color: #eac2c2;
+}
+
+.domain-control {
+    grid-area: control;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.domain-slider {
+    flex: 1;
+    cursor: pointer;
+}
+
+.domain-value {
+    width: 3.5em;
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+}
+
+.hidden {
+    display: none;
+}
