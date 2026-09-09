@@ -18,6 +18,17 @@
     const MAX_OPACITY = 0.9;
 
     /**
+     * How much the keyboard shortcuts change the shade level per press.
+     */
+    const STEP = 5;
+
+    /**
+     * The level to shade to when toggling shading on via the keyboard for a
+     * domain that has no remembered level.
+     */
+    const DEFAULT_LEVEL = 20;
+
+    /**
      * Get the current page's domain (hostname). Returns null for pages that
      * don't have a meaningful hostname (e.g. about: pages).
      */
@@ -130,6 +141,27 @@
     }
 
     /**
+     * Change the current page's shade level by the given delta (positive to
+     * dim more, negative to dim less), clamped to the valid range.
+     */
+    async function adjustLevel(delta) {
+        await setLevel(getCurrentLevel() + Number(delta));
+    }
+
+    /**
+     * Toggle shading on the current page. If shaded, turn it off; otherwise
+     * apply the remembered level for the domain, or the default if none.
+     */
+    async function toggleShade() {
+        if (getCurrentLevel() > 0) {
+            await setLevel(0);
+        } else {
+            const remembered = await getLevelForDomain(getDomain());
+            await setLevel(remembered > 0 ? remembered : DEFAULT_LEVEL);
+        }
+    }
+
+    /**
      * On load, check whether the current domain has a remembered shade level,
      * apply it if so, and report the level for the toolbar badge.
      */
@@ -147,6 +179,10 @@
     browser.runtime.onMessage.addListener((message) => {
         if (message.command === "setLevel") {
             setLevel(message.level);
+        } else if (message.command === "adjustLevel") {
+            adjustLevel(message.delta);
+        } else if (message.command === "toggleShade") {
+            toggleShade();
         } else if (message.command === "getLevel") {
             return Promise.resolve({
                 level: normalizeLevel(getCurrentLevel()),

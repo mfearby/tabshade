@@ -14,6 +14,26 @@
   "options_ui": {
     "page": "options/options.html"
   },
+  "commands": {
+    "dim-increase": {
+      "suggested_key": {
+        "default": "Alt+Shift+Up"
+      },
+      "description": "Dim the current tab more"
+    },
+    "dim-decrease": {
+      "suggested_key": {
+        "default": "Alt+Shift+Down"
+      },
+      "description": "Dim the current tab less"
+    },
+    "toggle-shade": {
+      "suggested_key": {
+        "default": "Alt+Shift+D"
+      },
+      "description": "Toggle shading on the current tab"
+    }
+  },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],

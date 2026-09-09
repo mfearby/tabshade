@@ -52,6 +52,41 @@ browser.tabs.onActivated.addListener((activeInfo) => {
 });
 
 /**
+ * How much each dim shortcut press changes the shade level.
+ */
+const STEP = 5;
+
+/**
+ * Handle keyboard shortcuts. Commands fire globally, so we look up the active
+ * tab and forward the appropriate instruction to its content script.
+ */
+browser.commands.onCommand.addListener(async (command) => {
+    let message;
+    if (command === "dim-increase") {
+        message = { command: "adjustLevel", delta: STEP };
+    } else if (command === "dim-decrease") {
+        message = { command: "adjustLevel", delta: -STEP };
+    } else if (command === "toggle-shade") {
+        message = { command: "toggleShade" };
+    } else {
+        return;
+    }
+
+    try {
+        const [tab] = await browser.tabs.query({
+            active: true,
+            currentWindow: true,
+        });
+        if (tab) {
+            await browser.tabs.sendMessage(tab.id, message);
+        }
+    } catch (error) {
+        // The active tab may have no content script (e.g. about: pages).
+        console.error(`TabShade shortcut failed: ${error}`);
+    }
+});
+
+/**
  * Give the badge a consistent look.
  */
 browser.action.setBadgeBackgroundColor({ color: "#5a5a8f" });
