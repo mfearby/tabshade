@@ -163,14 +163,19 @@
 
     /**
      * Notify the background script that this tab's shade level changed, so it
-     * can update the badge shown on the toolbar icon.
+     * can update the badge shown on the toolbar icon. Includes whether this
+     * domain is saved, so the badge can be coloured differently.
      */
-    function notifyLevelChanged(level) {
-        browser.runtime
-            .sendMessage({ command: "levelChanged", level: normalizeLevel(level) })
-            .catch(() => {
-                // No receiver (e.g. background not ready); safe to ignore.
+    async function notifyLevelChanged(level) {
+        try {
+            await browser.runtime.sendMessage({
+                command: "levelChanged",
+                level: normalizeLevel(level),
+                saved: await isDomainSaved(getDomain()),
             });
+        } catch (error) {
+            // No receiver (e.g. background not ready); safe to ignore.
+        }
     }
 
     /**

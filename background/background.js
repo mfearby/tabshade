@@ -4,15 +4,27 @@
  */
 
 /**
- * Set (or clear) the badge for a given tab. A level of 0 clears the badge;
- * any higher level shows the percentage.
+ * Badge colours: a medium yellow when the level comes from a saved site, and
+ * the default blue-grey otherwise (e.g. a "shade by default" level).
  */
-function setBadgeForTab(tabId, level) {
+const SAVED_BADGE_COLOR = "#fdeaaf";
+const DEFAULT_BADGE_COLOR = "#5a5a8f";
+
+/**
+ * Set (or clear) the badge for a given tab. A level of 0 clears the badge;
+ * any higher level shows the percentage. The badge colour reflects whether the
+ * level comes from a saved site.
+ */
+function setBadgeForTab(tabId, level, saved) {
     if (typeof tabId !== "number") {
         return;
     }
     const text = level > 0 ? `${level}` : "";
     browser.action.setBadgeText({ tabId, text });
+    browser.action.setBadgeBackgroundColor({
+        tabId,
+        color: saved ? SAVED_BADGE_COLOR : DEFAULT_BADGE_COLOR,
+    });
 }
 
 /**
@@ -27,10 +39,11 @@ async function refreshBadgeForTab(tabId) {
         });
         const level =
             response && typeof response.level === "number" ? response.level : 0;
-        setBadgeForTab(tabId, level);
+        const saved = !!(response && response.saved);
+        setBadgeForTab(tabId, level, saved);
     } catch (error) {
         // No content script in this tab; make sure the badge is cleared.
-        setBadgeForTab(tabId, 0);
+        setBadgeForTab(tabId, 0, false);
     }
 }
 
@@ -40,7 +53,7 @@ async function refreshBadgeForTab(tabId) {
  */
 browser.runtime.onMessage.addListener((message, sender) => {
     if (message && message.command === "levelChanged" && sender.tab) {
-        setBadgeForTab(sender.tab.id, message.level);
+        setBadgeForTab(sender.tab.id, message.level, !!message.saved);
     }
 });
 
@@ -85,8 +98,3 @@ browser.commands.onCommand.addListener(async (command) => {
         console.error(`TabShade shortcut failed: ${error}`);
     }
 });
-
-/**
- * Give the badge a consistent look.
- */
-browser.action.setBadgeBackgroundColor({ color: "#5a5a8f" });
