@@ -23,7 +23,7 @@ function setBadgeForTab(tabId, level) {
 async function refreshBadgeForTab(tabId) {
     try {
         const response = await browser.tabs.sendMessage(tabId, {
-            command: "getLevel",
+            command: "getState",
         });
         const level =
             response && typeof response.level === "number" ? response.level : 0;

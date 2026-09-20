@@ -7,22 +7,52 @@
 
     <body>
         <div id="popup-content">
-            <label id="shade-level-label" for="shade-level"
-                >Shade level: <span id="shade-level-value">0%</span></label
-            >
-            <input
-                type="range"
-                id="shade-level"
-                min="0"
-                max="100"
-                step="1"
-                value="0"
-            />
+            <section id="default-section">
+                <label class="switch-row">
+                    <input type="checkbox" id="shade-by-default" />
+                    <span>Shade by default</span>
+                </label>
+                <label id="default-level-label" for="default-level"
+                    >Default level:
+                    <span id="default-level-value">0%</span></label
+                >
+                <input
+                    type="range"
+                    id="default-level"
+                    min="0"
+                    max="100"
+                    step="1"
+                    value="0"
+                />
+            </section>
+
+            <section id="site-section">
+                <label class="switch-row">
+                    <input type="checkbox" id="save-site" />
+                    <span>Save this site's shade level</span>
+                </label>
+                <div id="site-level-wrap" class="hidden">
+                    <label id="site-level-label" for="site-level"
+                        >This site's level:
+                        <span id="site-level-value">0%</span></label
+                    >
+                    <input
+                        type="range"
+                        id="site-level"
+                        min="0"
+                        max="100"
+                        step="1"
+                        value="0"
+                    />
+                </div>
+            </section>
         </div>
+
         <div id="error-content" class="hidden">
             <p>Can't shade this web page.</p>
             <p>Try a different page.</p>
         </div>
+
         <footer id="shortcut-hint">
             <div>Alt+Shift+↑ more dim · Alt+Shift+↓ less dim</div>
             <div>Alt+Shift+D toggle</div>

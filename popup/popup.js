@@ -1,3 +1,6 @@
+const STORAGE_KEY = "shadedDomains";
+const SETTINGS_KEY = "settings";
+
 /**
  * Get the currently active tab in the current window.
  */
@@ -17,67 +20,153 @@ function reportError(error) {
 }
 
 /**
- * Update the label text to show the given shade level as a percentage.
+ * Clamp a shade level to the valid 0-100 range and coerce it to a number.
  */
-function setLabelValue(level) {
-    const valueEl = document.querySelector("#shade-level-value");
+function normalizeLevel(level) {
+    const n = Number(level);
+    if (!Number.isFinite(n)) {
+        return 0;
+    }
+    return Math.max(0, Math.min(100, Math.round(n)));
+}
+
+/**
+ * Read the global settings (shade by default + default level) from storage.
+ */
+async function getSettings() {
+    const result = await browser.storage.local.get(SETTINGS_KEY);
+    const stored = result[SETTINGS_KEY];
+    return {
+        shadeByDefault: !!(stored && stored.shadeByDefault),
+        defaultLevel: normalizeLevel(stored && stored.defaultLevel),
+    };
+}
+
+/**
+ * Persist the global settings to storage. The content scripts pick up the
+ * change via a storage listener and re-apply shading to open tabs.
+ */
+async function saveSettings(settings) {
+    await browser.storage.local.set({ [SETTINGS_KEY]: settings });
+}
+
+/**
+ * Send a message to the active tab's content script.
+ */
+async function messageActiveTab(message) {
+    const tab = await getActiveTab();
+    return browser.tabs.sendMessage(tab.id, message);
+}
+
+/**
+ * Update a slider's position and its "%" label together.
+ */
+function setSlider(sliderId, valueId, level) {
+    const slider = document.querySelector(`#${sliderId}`);
+    const valueEl = document.querySelector(`#${valueId}`);
+    if (slider) {
+        slider.value = String(level);
+    }
     if (valueEl) {
         valueEl.textContent = `${level}%`;
     }
 }
 
 /**
- * Update the slider position and the label to reflect the given shade level.
+ * Enable or disable the default-level slider depending on whether shading by
+ * default is switched on.
  */
-function setSliderValue(level) {
-    const slider = document.querySelector("#shade-level");
-    if (slider) {
-        slider.value = String(level);
-    }
-    setLabelValue(level);
+function setDefaultSectionEnabled(enabled) {
+    const section = document.querySelector("#default-section");
+    const slider = document.querySelector("#default-level");
+    section.classList.toggle("disabled", !enabled);
+    slider.disabled = !enabled;
 }
 
 /**
- * Ask the content script for the level currently applied to the page and
- * update the slider to match.
+ * Show or hide the per-site slider based on the "save this site" checkbox.
  */
-async function syncSliderFromPage(tabId) {
-    try {
-        const response = await browser.tabs.sendMessage(tabId, {
-            command: "getLevel",
-        });
-        if (response && typeof response.level === "number") {
-            // Reflect the level actually applied to the page: 0 when the page
-            // is unshaded, or the remembered level when it is shaded.
-            setSliderValue(response.level);
-        }
-    } catch (error) {
-        reportError(error);
-    }
+function setSiteSliderVisible(visible) {
+    document.querySelector("#site-level-wrap").classList.toggle("hidden", !visible);
 }
 
 /**
- * Listen for changes on the shade level slider and send the new level to the
- * content script, which applies it and remembers it for the current domain.
+ * Wire up the "Shade by default" toggle and its default-level slider.
  */
-function listenForSlider() {
-    const slider = document.querySelector("#shade-level");
-    if (!slider) {
-        return;
-    }
-    slider.addEventListener("input", async (e) => {
-        const level = Number(e.target.value);
-        setLabelValue(level);
+function listenForDefaultControls() {
+    const toggle = document.querySelector("#shade-by-default");
+    const slider = document.querySelector("#default-level");
+
+    toggle.addEventListener("change", async () => {
+        const settings = await getSettings();
+        settings.shadeByDefault = toggle.checked;
+        setDefaultSectionEnabled(toggle.checked);
+        await saveSettings(settings);
+    });
+
+    slider.addEventListener("input", async () => {
+        const level = normalizeLevel(slider.value);
+        setSlider("default-level", "default-level-value", level);
+        const settings = await getSettings();
+        settings.defaultLevel = level;
+        await saveSettings(settings);
+    });
+}
+
+/**
+ * Wire up the "Save this site's shade level" checkbox and the per-site slider.
+ */
+function listenForSiteControls() {
+    const checkbox = document.querySelector("#save-site");
+    const slider = document.querySelector("#site-level");
+
+    checkbox.addEventListener("change", async () => {
+        setSiteSliderVisible(checkbox.checked);
         try {
-            const tab = await getActiveTab();
-            await browser.tabs.sendMessage(tab.id, {
-                command: "setLevel",
-                level,
-            });
+            if (checkbox.checked) {
+                // Save the level currently in effect for this tab.
+                const level = normalizeLevel(slider.value);
+                await messageActiveTab({ command: "saveSite", level });
+            } else {
+                await messageActiveTab({ command: "unsaveSite" });
+            }
         } catch (error) {
             reportError(error);
         }
     });
+
+    slider.addEventListener("input", async () => {
+        const level = normalizeLevel(slider.value);
+        setSlider("site-level", "site-level-value", level);
+        try {
+            await messageActiveTab({ command: "saveSite", level });
+        } catch (error) {
+            reportError(error);
+        }
+    });
+}
+
+/**
+ * Initialise the popup controls from stored settings and the active tab's
+ * current state.
+ */
+async function initControls(tabId) {
+    const settings = await getSettings();
+
+    // Default section.
+    document.querySelector("#shade-by-default").checked = settings.shadeByDefault;
+    setSlider("default-level", "default-level-value", settings.defaultLevel);
+    setDefaultSectionEnabled(settings.shadeByDefault);
+
+    // Site section, based on what the content script reports.
+    const state = await browser.tabs.sendMessage(tabId, { command: "getState" });
+    const saved = !!(state && state.saved);
+    const currentLevel = state && typeof state.level === "number" ? state.level : 0;
+    const siteLevel = saved ? normalizeLevel(state.savedLevel) : currentLevel;
+
+    document.querySelector("#save-site").checked = saved;
+    setSiteSliderVisible(saved);
+    setSlider("site-level", "site-level-value", siteLevel);
 }
 
 /**
@@ -91,8 +180,8 @@ function reportExecuteScriptError(error) {
 }
 
 /**
- * When the popup loads, inject a content script into the active tab, wire up
- * the controls, and sync the slider to the page's current shade level.
+ * When the popup loads, inject the content script into the active tab, wire up
+ * the controls, and initialise them from stored settings and tab state.
  * If the extension couldn't inject the script, handle the error.
  */
 (async function runOnPopupOpened() {
@@ -104,8 +193,9 @@ function reportExecuteScriptError(error) {
             files: ["/content_scripts/shader.js"],
         });
 
-        listenForSlider();
-        await syncSliderFromPage(tab.id);
+        listenForDefaultControls();
+        listenForSiteControls();
+        await initControls(tab.id);
     } catch (e) {
         reportExecuteScriptError(e);
     }

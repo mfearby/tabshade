@@ -9,7 +9,14 @@
     window.hasRun = true;
 
     const OVERLAY_ID = "tabshade-overlay";
+
+    /**
+     * Storage keys. `shadedDomains` holds only the sites the user has
+     * explicitly chosen to save (domain -> level). `settings` holds the global
+     * "shade by default" preference and its level.
+     */
     const STORAGE_KEY = "shadedDomains";
+    const SETTINGS_KEY = "settings";
 
     /**
      * The maximum opacity the overlay reaches at 100%. Kept below 1 so a fully
@@ -23,10 +30,10 @@
     const STEP = 5;
 
     /**
-     * The level to shade to when toggling shading on via the keyboard for a
-     * domain that has no remembered level.
+     * The level used when toggling shading on for a page that has no saved or
+     * default level to fall back to.
      */
-    const DEFAULT_LEVEL = 20;
+    const FALLBACK_LEVEL = 20;
 
     /**
      * Get the current page's domain (hostname). Returns null for pages that
@@ -48,8 +55,8 @@
     }
 
     /**
-     * Read the map of remembered domains (domain -> shade level) from local
-     * storage. Returns a plain object.
+     * Read the map of saved domains (domain -> shade level) from local storage.
+     * Only contains sites the user explicitly chose to save.
      */
     async function getShadedDomains() {
         const result = await browser.storage.local.get(STORAGE_KEY);
@@ -58,26 +65,32 @@
     }
 
     /**
-     * Remember the given domain and its shade level in local storage. A level
-     * of 0 removes the domain so it is no longer shaded automatically.
+     * Read the global settings: whether to shade by default and at what level.
      */
-    async function rememberDomain(domain, level) {
-        if (!domain) {
-            return;
-        }
-        const domains = await getShadedDomains();
-        if (level <= 0) {
-            delete domains[domain];
-        } else {
-            domains[domain] = level;
-        }
-        await browser.storage.local.set({ [STORAGE_KEY]: domains });
+    async function getSettings() {
+        const result = await browser.storage.local.get(SETTINGS_KEY);
+        const stored = result[SETTINGS_KEY];
+        return {
+            shadeByDefault: !!(stored && stored.shadeByDefault),
+            defaultLevel: normalizeLevel(stored && stored.defaultLevel),
+        };
     }
 
     /**
-     * Read the remembered shade level for the given domain, or 0 if none.
+     * Whether the current domain has an explicitly saved shade level.
      */
-    async function getLevelForDomain(domain) {
+    async function isDomainSaved(domain) {
+        if (!domain) {
+            return false;
+        }
+        const domains = await getShadedDomains();
+        return Object.prototype.hasOwnProperty.call(domains, domain);
+    }
+
+    /**
+     * Read the saved shade level for the given domain, or 0 if it isn't saved.
+     */
+    async function getSavedLevel(domain) {
         if (!domain) {
             return 0;
         }
@@ -86,8 +99,37 @@
     }
 
     /**
+     * Save a shade level for the current domain in local storage so it appears
+     * in the preferences screen and is applied automatically on future visits.
+     */
+    async function saveDomain(domain, level) {
+        if (!domain) {
+            return;
+        }
+        const domains = await getShadedDomains();
+        domains[domain] = normalizeLevel(level);
+        await browser.storage.local.set({ [STORAGE_KEY]: domains });
+    }
+
+    /**
+     * Remove the current domain from the saved list. The page falls back to the
+     * "shade by default" behaviour (or no shading) afterwards.
+     */
+    async function unsaveDomain(domain) {
+        if (!domain) {
+            return;
+        }
+        const domains = await getShadedDomains();
+        if (Object.prototype.hasOwnProperty.call(domains, domain)) {
+            delete domains[domain];
+            await browser.storage.local.set({ [STORAGE_KEY]: domains });
+        }
+    }
+
+    /**
      * Apply the given shade level to the page. A level of 0 removes the
      * overlay; any higher level creates or updates it with a matching opacity.
+     * This only changes what is shown; it does not touch storage.
      */
     function applyLevel(level) {
         const normalized = normalizeLevel(level);
@@ -97,6 +139,7 @@
             if (overlay) {
                 overlay.remove();
             }
+            notifyLevelChanged(0);
             return;
         }
 
@@ -115,6 +158,7 @@
 
         const opacity = (normalized / 100) * MAX_OPACITY;
         overlay.style.backgroundColor = `rgba(0, 0, 0, ${opacity})`;
+        notifyLevelChanged(normalized);
     }
 
     /**
@@ -130,79 +174,120 @@
     }
 
     /**
-     * Set the shade level for the current page: apply it visually, remember
-     * (or forget) the domain in local storage, and update the toolbar badge.
+     * Change the current shade level, and if this domain is saved, persist the
+     * new level too. Used by both the popup slider and keyboard shortcuts.
      */
-    async function setLevel(level) {
+    async function changeLevel(level) {
         const normalized = normalizeLevel(level);
         applyLevel(normalized);
-        await rememberDomain(getDomain(), normalized);
-        notifyLevelChanged(normalized);
+        const domain = getDomain();
+        if (await isDomainSaved(domain)) {
+            await saveDomain(domain, normalized);
+        }
     }
 
     /**
-     * Change the current page's shade level by the given delta (positive to
-     * dim more, negative to dim less), clamped to the valid range.
+     * Change the current shade level by the given delta (positive to dim more,
+     * negative to dim less), clamped to the valid range.
      */
     async function adjustLevel(delta) {
-        await setLevel(getCurrentLevel() + Number(delta));
+        await changeLevel(getCurrentLevel() + Number(delta));
     }
 
     /**
      * Toggle shading on the current page. If shaded, turn it off; otherwise
-     * apply the remembered level for the domain, or the default if none.
+     * apply the saved level, the default level, or a fallback, in that order.
      */
     async function toggleShade() {
         if (getCurrentLevel() > 0) {
-            await setLevel(0);
-        } else {
-            const remembered = await getLevelForDomain(getDomain());
-            await setLevel(remembered > 0 ? remembered : DEFAULT_LEVEL);
+            await changeLevel(0);
+            return;
         }
+        const domain = getDomain();
+        const saved = await getSavedLevel(domain);
+        if (saved > 0) {
+            await changeLevel(saved);
+            return;
+        }
+        const settings = await getSettings();
+        const fallback =
+            settings.shadeByDefault && settings.defaultLevel > 0
+                ? settings.defaultLevel
+                : FALLBACK_LEVEL;
+        await changeLevel(fallback);
     }
 
     /**
-     * On load, check whether the current domain has a remembered shade level,
-     * apply it if so, and report the level for the toolbar badge.
+     * Determine the level that should be applied to this page on load: a saved
+     * per-domain level takes precedence, otherwise the global default when
+     * "shade by default" is enabled, otherwise no shading.
      */
-    async function applyIfRemembered() {
-        const level = await getLevelForDomain(getDomain());
-        if (level > 0) {
-            applyLevel(level);
+    async function resolveInitialLevel() {
+        const domain = getDomain();
+        if (await isDomainSaved(domain)) {
+            return getSavedLevel(domain);
         }
-        notifyLevelChanged(level);
+        const settings = await getSettings();
+        if (settings.shadeByDefault) {
+            return settings.defaultLevel;
+        }
+        return 0;
+    }
+
+    /**
+     * On load, apply the resolved level for this page and report it for the
+     * toolbar badge.
+     */
+    async function applyOnLoad() {
+        applyLevel(await resolveInitialLevel());
     }
 
     /**
      * Listen for messages from the popup.
      */
     browser.runtime.onMessage.addListener((message) => {
-        if (message.command === "setLevel") {
-            setLevel(message.level);
+        if (message.command === "changeLevel") {
+            changeLevel(message.level);
         } else if (message.command === "adjustLevel") {
             adjustLevel(message.delta);
         } else if (message.command === "toggleShade") {
             toggleShade();
-        } else if (message.command === "getLevel") {
-            return Promise.resolve({
-                level: normalizeLevel(getCurrentLevel()),
-            });
+        } else if (message.command === "saveSite") {
+            applyLevel(message.level);
+            saveDomain(getDomain(), message.level);
+        } else if (message.command === "unsaveSite") {
+            unsaveDomain(getDomain());
+        } else if (message.command === "getState") {
+            return getState();
         }
     });
 
     /**
-     * React to shade levels being changed elsewhere (e.g. from the preferences
-     * page). If this domain's stored level differs from what is currently
-     * applied, update the page and the toolbar badge to match.
+     * Build a snapshot of the current tab's state for the popup: the level
+     * currently applied, whether this domain is saved, and its saved level.
+     */
+    async function getState() {
+        const domain = getDomain();
+        const saved = await isDomainSaved(domain);
+        return {
+            level: normalizeLevel(getCurrentLevel()),
+            domain,
+            saved,
+            savedLevel: saved ? await getSavedLevel(domain) : 0,
+        };
+    }
+
+    /**
+     * React to changes made elsewhere (the preferences page, or settings
+     * changing) by re-resolving and re-applying this page's level.
      */
     browser.storage.onChanged.addListener(async (changes, area) => {
-        if (area !== "local" || !changes[STORAGE_KEY]) {
+        if (area !== "local" || (!changes[STORAGE_KEY] && !changes[SETTINGS_KEY])) {
             return;
         }
-        const stored = await getLevelForDomain(getDomain());
-        if (stored !== getCurrentLevel()) {
-            applyLevel(stored);
-            notifyLevelChanged(stored);
+        const resolved = await resolveInitialLevel();
+        if (resolved !== getCurrentLevel()) {
+            applyLevel(resolved);
         }
     });
 
@@ -225,5 +310,5 @@
         return Math.round((opacity / MAX_OPACITY) * 100);
     }
 
-    applyIfRemembered();
+    applyOnLoad();
 })();
