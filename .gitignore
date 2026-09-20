@@ -1,2 +1,5 @@
 # macOS
 .DS_Store
+# Node / web-ext
+node_modules/
+web-ext-artifacts/

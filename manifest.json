@@ -2,10 +2,11 @@
   "description": "Shades current browser tab to reduce the brightness",
   "manifest_version": 3,
   "name": "TabShade",
-  "version": "1.0",
-  "homepage_url": "https://github.com/mfearby",
+  "version": "1.0.0",
+  "homepage_url": "https://github.com/mfearby/tabshade",
   "icons": {
-    "48": "icons/shader-48.png"
+    "48": "icons/shader-48.png",
+    "96": "icons/shader-96.png"
   },
   "permissions": ["activeTab", "scripting", "storage"],
   "background": {
