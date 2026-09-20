@@ -69,3 +69,24 @@ section {
     color: #777;
     text-align: center;
 }
+
+/* Dark theme: the inverse of the default light styling. */
+body.dark {
+    color: #ececec;
+    background-color: #1e1e1e;
+    color-scheme: dark;
+}
+
+body.dark #default-section {
+    border-bottom-color: #3a3a3a;
+}
+
+body.dark #default-level-label,
+body.dark #site-level-label {
+    color: #b5b5b5;
+}
+
+body.dark #shortcut-hint {
+    border-top-color: #3a3a3a;
+    color: #9a9a9a;
+}

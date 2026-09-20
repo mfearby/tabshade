@@ -39,7 +39,15 @@ async function getSettings() {
     return {
         shadeByDefault: !!(stored && stored.shadeByDefault),
         defaultLevel: normalizeLevel(stored && stored.defaultLevel),
+        theme: stored && stored.theme === "dark" ? "dark" : "light",
     };
+}
+
+/**
+ * Apply the given theme ("light" or "dark") to the popup.
+ */
+function applyTheme(theme) {
+    document.body.classList.toggle("dark", theme === "dark");
 }
 
 /**
@@ -185,6 +193,9 @@ function reportExecuteScriptError(error) {
  * If the extension couldn't inject the script, handle the error.
  */
 (async function runOnPopupOpened() {
+    // Apply the saved theme first so it shows even if shading isn't available.
+    applyTheme((await getSettings()).theme);
+
     try {
         const tab = await getActiveTab();
 

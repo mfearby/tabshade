@@ -1,4 +1,35 @@
 const STORAGE_KEY = "shadedDomains";
+const SETTINGS_KEY = "settings";
+
+/**
+ * Read the global settings object from storage, preserving unknown fields.
+ */
+async function getSettings() {
+    const result = await browser.storage.local.get(SETTINGS_KEY);
+    const stored = result[SETTINGS_KEY];
+    return stored && typeof stored === "object" ? { ...stored } : {};
+}
+
+/**
+ * Update the theme setting without disturbing other settings fields.
+ */
+async function saveTheme(theme) {
+    const settings = await getSettings();
+    settings.theme = theme;
+    await browser.storage.local.set({ [SETTINGS_KEY]: settings });
+}
+
+/**
+ * Initialise the dark-theme checkbox from storage and persist changes to it.
+ */
+async function initThemeControl() {
+    const checkbox = document.querySelector("#dark-theme");
+    const settings = await getSettings();
+    checkbox.checked = settings.theme === "dark";
+    checkbox.addEventListener("change", () => {
+        saveTheme(checkbox.checked ? "dark" : "light");
+    });
+}
 
 /**
  * Clamp a shade level to the valid 0-100 range and coerce it to a number.
@@ -145,4 +176,5 @@ browser.storage.onChanged.addListener((changes, area) => {
     }
 });
 
+initThemeControl();
 render();
