@@ -16,15 +16,48 @@ h2 {
     margin: 20px 0 8px;
 }
 
-#appearance .switch-row {
+#appearance .switch-row,
+#shading .switch-row {
     display: flex;
     align-items: center;
     gap: 8px;
     cursor: pointer;
 }
 
-#appearance .switch-row input {
+#appearance .switch-row input,
+#shading .switch-row input {
     cursor: pointer;
+}
+
+#default-level-label {
+    display: block;
+    margin: 10px 0 2px;
+    color: #555;
+}
+
+#default-level {
+    display: block;
+    width: 100%;
+    max-width: 320px;
+    margin: 2px 0 0;
+    cursor: pointer;
+}
+
+#shading .sub-option {
+    margin-top: 10px;
+    font-weight: 400;
+}
+
+#skip-dark-sites-note {
+    margin: 6px 0 0;
+    color: #555;
+    font-size: 0.9em;
+}
+
+#shading.disabled #default-level-label,
+#shading.disabled #default-level,
+#shading.disabled .sub-option {
+    opacity: 0.5;
 }
 
 #intro {

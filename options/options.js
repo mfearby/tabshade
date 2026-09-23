@@ -32,6 +32,68 @@ async function initThemeControl() {
 }
 
 /**
+ * Merge a partial set of fields into the stored settings, preserving the rest.
+ */
+async function updateSettings(fields) {
+    const settings = await getSettings();
+    Object.assign(settings, fields);
+    await browser.storage.local.set({ [SETTINGS_KEY]: settings });
+}
+
+/**
+ * Update a slider's position and its "%" label together.
+ */
+function setDefaultSlider(level) {
+    const slider = document.querySelector("#default-level");
+    const valueEl = document.querySelector("#default-level-value");
+    slider.value = String(level);
+    valueEl.textContent = `${level}%`;
+}
+
+/**
+ * Enable or disable the default-level slider and the "Ignore dark sites"
+ * checkbox depending on whether shading by default is switched on.
+ */
+function setShadingSectionEnabled(enabled) {
+    const section = document.querySelector("#shading");
+    section.classList.toggle("disabled", !enabled);
+    document.querySelector("#default-level").disabled = !enabled;
+    document.querySelector("#skip-dark-sites").disabled = !enabled;
+}
+
+/**
+ * Initialise the "Shade by default" toggle, its default-level slider, and the
+ * "Ignore dark sites" checkbox from storage, and persist changes to each.
+ */
+async function initShadingControls() {
+    const settings = await getSettings();
+
+    const toggle = document.querySelector("#shade-by-default");
+    const slider = document.querySelector("#default-level");
+    const skipDark = document.querySelector("#skip-dark-sites");
+
+    toggle.checked = !!settings.shadeByDefault;
+    setDefaultSlider(normalizeLevel(settings.defaultLevel));
+    skipDark.checked = !!settings.skipDarkSites;
+    setShadingSectionEnabled(!!settings.shadeByDefault);
+
+    toggle.addEventListener("change", async () => {
+        setShadingSectionEnabled(toggle.checked);
+        await updateSettings({ shadeByDefault: toggle.checked });
+    });
+
+    slider.addEventListener("input", async () => {
+        const level = normalizeLevel(slider.value);
+        setDefaultSlider(level);
+        await updateSettings({ defaultLevel: level });
+    });
+
+    skipDark.addEventListener("change", async () => {
+        await updateSettings({ skipDarkSites: skipDark.checked });
+    });
+}
+
+/**
  * Clamp a shade level to the valid 0-100 range and coerce it to a number.
  */
 function normalizeLevel(level) {
@@ -166,7 +228,21 @@ async function render() {
  * slider edits to avoid disrupting an in-progress drag.
  */
 browser.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes[STORAGE_KEY] && !document.hidden) {
+    if (area !== "local") {
+        return;
+    }
+
+    // Keep the shading controls in sync when settings change elsewhere (e.g.
+    // the popup), unless the user is mid-drag on this page's slider.
+    if (changes[SETTINGS_KEY] && !document.hidden) {
+        const activeEl = document.activeElement;
+        const draggingHere = activeEl && activeEl.id === "default-level";
+        if (!draggingHere) {
+            syncShadingControls();
+        }
+    }
+
+    if (changes[STORAGE_KEY] && !document.hidden) {
         // Only re-render when the options page is not the active editor to
         // avoid yanking a slider out from under the user mid-drag.
         if (document.activeElement && document.activeElement.type === "range") {
@@ -176,5 +252,18 @@ browser.storage.onChanged.addListener((changes, area) => {
     }
 });
 
+/**
+ * Refresh the shading controls from stored settings without re-attaching
+ * listeners. Used when settings change from another surface (e.g. the popup).
+ */
+async function syncShadingControls() {
+    const settings = await getSettings();
+    document.querySelector("#shade-by-default").checked = !!settings.shadeByDefault;
+    setDefaultSlider(normalizeLevel(settings.defaultLevel));
+    document.querySelector("#skip-dark-sites").checked = !!settings.skipDarkSites;
+    setShadingSectionEnabled(!!settings.shadeByDefault);
+}
+
 initThemeControl();
+initShadingControls();
 render();

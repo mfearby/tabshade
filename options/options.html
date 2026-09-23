@@ -16,6 +16,33 @@
             </label>
         </section>
 
+        <section id="shading">
+            <h2>Shading</h2>
+            <label class="switch-row">
+                <input type="checkbox" id="shade-by-default" />
+                <span>Shade by default</span>
+            </label>
+            <label id="default-level-label" for="default-level"
+                >Default level: <span id="default-level-value">0%</span></label
+            >
+            <input
+                type="range"
+                id="default-level"
+                min="0"
+                max="100"
+                step="1"
+                value="0"
+            />
+            <label class="switch-row sub-option">
+                <input type="checkbox" id="skip-dark-sites" />
+                <span>Ignore dark sites (experimental)</span>
+            </label>
+            <p id="skip-dark-sites-note">
+                When "Shade by default" is on, skip pages that already have a
+                dark background (detection not always reliable).
+            </p>
+        </section>
+
         <h2>Saved sites</h2>
         <p id="intro">
             Domains with an automatic shade level. Adjust a slider to change the

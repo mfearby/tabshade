@@ -73,7 +73,66 @@
         return {
             shadeByDefault: !!(stored && stored.shadeByDefault),
             defaultLevel: normalizeLevel(stored && stored.defaultLevel),
+            skipDarkSites: !!(stored && stored.skipDarkSites),
         };
+    }
+
+    /**
+     * Parse a CSS color string (as returned by getComputedStyle, e.g.
+     * "rgb(20, 20, 20)" or "rgba(0, 0, 0, 0.5)") into {r, g, b, a}, or null if
+     * it can't be understood.
+     */
+    function parseColor(color) {
+        if (!color) {
+            return null;
+        }
+        const match = color.match(
+            /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+))?\s*\)/i
+        );
+        if (!match) {
+            return null;
+        }
+        return {
+            r: parseFloat(match[1]),
+            g: parseFloat(match[2]),
+            b: parseFloat(match[3]),
+            a: match[4] !== undefined ? parseFloat(match[4]) : 1,
+        };
+    }
+
+    /**
+     * Find the effective background colour of the page by checking <body> then
+     * <html>, skipping fully transparent backgrounds. Falls back to white,
+     * which is what a browser renders when no background is set.
+     */
+    function getPageBackgroundColor() {
+        const candidates = [document.body, document.documentElement];
+        for (const el of candidates) {
+            if (!el) {
+                continue;
+            }
+            const color = parseColor(getComputedStyle(el).backgroundColor);
+            if (color && color.a > 0) {
+                return color;
+            }
+        }
+        return { r: 255, g: 255, b: 255, a: 1 };
+    }
+
+    /**
+     * The perceived-luminance threshold (0-255) below which a page background
+     * is considered "dark". Around 40% brightness.
+     */
+    const DARK_LUMINANCE_THRESHOLD = 110;
+
+    /**
+     * Decide whether the current page already uses a dark background, using the
+     * standard perceived-luminance formula weighted for human vision.
+     */
+    function isPageDark() {
+        const { r, g, b } = getPageBackgroundColor();
+        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+        return luminance < DARK_LUMINANCE_THRESHOLD;
     }
 
     /**
@@ -234,6 +293,12 @@
         }
         const settings = await getSettings();
         if (settings.shadeByDefault) {
+            // Leave already-dark pages alone when the user has opted to skip
+            // them. This only affects the automatic default; explicitly saved
+            // sites and manual adjustments are unaffected.
+            if (settings.skipDarkSites && isPageDark()) {
+                return 0;
+            }
             return settings.defaultLevel;
         }
         return 0;
@@ -279,6 +344,7 @@
             domain,
             saved,
             savedLevel: saved ? await getSavedLevel(domain) : 0,
+            isDark: isPageDark(),
         };
     }
 

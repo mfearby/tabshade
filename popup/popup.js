@@ -39,6 +39,7 @@ async function getSettings() {
     return {
         shadeByDefault: !!(stored && stored.shadeByDefault),
         defaultLevel: normalizeLevel(stored && stored.defaultLevel),
+        skipDarkSites: !!(stored && stored.skipDarkSites),
         theme: stored && stored.theme === "dark" ? "dark" : "light",
     };
 }
@@ -87,8 +88,10 @@ function setSlider(sliderId, valueId, level) {
 function setDefaultSectionEnabled(enabled) {
     const section = document.querySelector("#default-section");
     const slider = document.querySelector("#default-level");
+    const skipDark = document.querySelector("#skip-dark-sites");
     section.classList.toggle("disabled", !enabled);
     slider.disabled = !enabled;
+    skipDark.disabled = !enabled;
 }
 
 /**
@@ -117,6 +120,13 @@ function listenForDefaultControls() {
         setSlider("default-level", "default-level-value", level);
         const settings = await getSettings();
         settings.defaultLevel = level;
+        await saveSettings(settings);
+    });
+
+    const skipDark = document.querySelector("#skip-dark-sites");
+    skipDark.addEventListener("change", async () => {
+        const settings = await getSettings();
+        settings.skipDarkSites = skipDark.checked;
         await saveSettings(settings);
     });
 }
@@ -184,6 +194,7 @@ async function initControls(tabId) {
     // Default section.
     document.querySelector("#shade-by-default").checked = settings.shadeByDefault;
     setSlider("default-level", "default-level-value", settings.defaultLevel);
+    document.querySelector("#skip-dark-sites").checked = settings.skipDarkSites;
     setDefaultSectionEnabled(settings.shadeByDefault);
 
     // Site section, based on what the content script reports.
@@ -191,6 +202,10 @@ async function initControls(tabId) {
     const saved = !!(state && state.saved);
     const currentLevel = state && typeof state.level === "number" ? state.level : 0;
     const siteLevel = saved ? normalizeLevel(state.savedLevel) : currentLevel;
+
+    // Show a hint when this page is detected as already dark.
+    const isDark = !!(state && state.isDark);
+    document.querySelector("#dark-detected-hint").classList.toggle("hidden", !isDark);
 
     // Tab section reflects the level currently applied to this tab.
     setSlider("tab-level", "tab-level-value", currentLevel);

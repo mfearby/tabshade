@@ -63,8 +63,22 @@ section {
     cursor: pointer;
 }
 
+.sub-option {
+    margin-top: 10px;
+    font-weight: 400;
+    font-size: 0.95em;
+}
+
+.hint {
+    margin: 6px 0 0;
+    font-size: 0.85em;
+    font-style: italic;
+    color: #777;
+}
+
 #default-section.disabled #default-level-label,
-#default-section.disabled #default-level {
+#default-section.disabled #default-level,
+#default-section.disabled .sub-option {
     opacity: 0.5;
 }
 
@@ -94,6 +108,10 @@ body.dark #default-level-label,
 body.dark #tab-level-label,
 body.dark #site-level-label {
     color: #b5b5b5;
+}
+
+body.dark .hint {
+    color: #9a9a9a;
 }
 
 body.dark #shortcut-hint {
