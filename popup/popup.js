@@ -122,6 +122,26 @@ function listenForDefaultControls() {
 }
 
 /**
+ * Wire up the "Shade this tab (not saved)" slider. This mirrors the keyboard
+ * shortcuts: it changes the level applied to the current tab live, but does
+ * not persist anything unless the site is already saved (the content script's
+ * changeLevel handles that). It resets on reload.
+ */
+function listenForTabControls() {
+    const slider = document.querySelector("#tab-level");
+
+    slider.addEventListener("input", async () => {
+        const level = normalizeLevel(slider.value);
+        setSlider("tab-level", "tab-level-value", level);
+        try {
+            await messageActiveTab({ command: "changeLevel", level });
+        } catch (error) {
+            reportError(error);
+        }
+    });
+}
+
+/**
  * Wire up the "Save this site's shade level" checkbox and the per-site slider.
  */
 function listenForSiteControls() {
@@ -172,6 +192,9 @@ async function initControls(tabId) {
     const currentLevel = state && typeof state.level === "number" ? state.level : 0;
     const siteLevel = saved ? normalizeLevel(state.savedLevel) : currentLevel;
 
+    // Tab section reflects the level currently applied to this tab.
+    setSlider("tab-level", "tab-level-value", currentLevel);
+
     document.querySelector("#save-site").checked = saved;
     setSiteSliderVisible(saved);
     setSlider("site-level", "site-level-value", siteLevel);
@@ -205,6 +228,7 @@ function reportExecuteScriptError(error) {
         });
 
         listenForDefaultControls();
+        listenForTabControls();
         listenForSiteControls();
         await initControls(tab.id);
     } catch (e) {

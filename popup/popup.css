@@ -23,6 +23,12 @@ section {
     padding-bottom: 10px;
 }
 
+#tab-section {
+    border-bottom: 1px solid #e0e0e0;
+    padding-top: 10px;
+    padding-bottom: 10px;
+}
+
 #site-section {
     padding-top: 10px;
 }
@@ -40,6 +46,7 @@ section {
 }
 
 #default-level-label,
+#tab-level-label,
 #site-level-label {
     display: block;
     margin: 8px auto 2px;
@@ -48,6 +55,7 @@ section {
 }
 
 #default-level,
+#tab-level,
 #site-level {
     display: block;
     width: 100%;
@@ -77,11 +85,13 @@ body.dark {
     color-scheme: dark;
 }
 
-body.dark #default-section {
+body.dark #default-section,
+body.dark #tab-section {
     border-bottom-color: #3a3a3a;
 }
 
 body.dark #default-level-label,
+body.dark #tab-level-label,
 body.dark #site-level-label {
     color: #b5b5b5;
 }
