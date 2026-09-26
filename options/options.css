@@ -135,3 +135,38 @@ h2 {
 .hidden {
     display: none;
 }
+
+/* Dark theme: applied to the whole preferences page. */
+body.dark {
+    color: #ececec;
+    background-color: #1e1e1e;
+    color-scheme: dark;
+}
+
+body.dark #intro,
+body.dark #default-level-label,
+body.dark #skip-dark-sites-note {
+    color: #b5b5b5;
+}
+
+body.dark .domain-row {
+    border-bottom-color: #3a3a3a;
+}
+
+body.dark .domain-remove {
+    background-color: #5a3a3a;
+    color: #ececec;
+}
+
+body.dark .domain-remove:hover {
+    background-color: #6b4444;
+}
+
+body.dark #attribution {
+    border-top-color: #3a3a3a;
+    color: #9a9a9a;
+}
+
+body.dark #attribution a {
+    color: #a3a3d4;
+}

@@ -259,6 +259,26 @@
     }
 
     /**
+     * Save the given level for the current domain, then apply it. Storage is
+     * written first so the badge notification (fired from applyLevel) sees the
+     * domain as saved and colours the badge accordingly.
+     */
+    async function saveSite(level) {
+        await saveDomain(getDomain(), level);
+        applyLevel(level);
+    }
+
+    /**
+     * Remove the current domain from the saved list, then re-notify so the
+     * badge reverts to the default (unsaved) colour. The applied level is left
+     * as-is for this tab; it simply is no longer persisted.
+     */
+    async function unsaveSite() {
+        await unsaveDomain(getDomain());
+        notifyLevelChanged(getCurrentLevel());
+    }
+
+    /**
      * Toggle shading on the current page. If shaded, turn it off; otherwise
      * apply the saved level, the default level, or a fallback, in that order.
      */
@@ -323,10 +343,9 @@
         } else if (message.command === "toggleShade") {
             toggleShade();
         } else if (message.command === "saveSite") {
-            applyLevel(message.level);
-            saveDomain(getDomain(), message.level);
+            saveSite(message.level);
         } else if (message.command === "unsaveSite") {
-            unsaveDomain(getDomain());
+            unsaveSite();
         } else if (message.command === "getState") {
             return getState();
         }

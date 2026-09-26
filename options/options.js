@@ -20,14 +20,26 @@ async function saveTheme(theme) {
 }
 
 /**
+ * Apply the given theme ("light" or "dark") to the preferences page.
+ */
+function applyTheme(theme) {
+    document.body.classList.toggle("dark", theme === "dark");
+}
+
+/**
  * Initialise the dark-theme checkbox from storage and persist changes to it.
+ * The theme applies to both the popup and this preferences page.
  */
 async function initThemeControl() {
     const checkbox = document.querySelector("#dark-theme");
     const settings = await getSettings();
-    checkbox.checked = settings.theme === "dark";
+    const isDark = settings.theme === "dark";
+    checkbox.checked = isDark;
+    applyTheme(isDark ? "dark" : "light");
     checkbox.addEventListener("change", () => {
-        saveTheme(checkbox.checked ? "dark" : "light");
+        const theme = checkbox.checked ? "dark" : "light";
+        applyTheme(theme);
+        saveTheme(theme);
     });
 }
 
@@ -262,6 +274,11 @@ async function syncShadingControls() {
     setDefaultSlider(normalizeLevel(settings.defaultLevel));
     document.querySelector("#skip-dark-sites").checked = !!settings.skipDarkSites;
     setShadingSectionEnabled(!!settings.shadeByDefault);
+
+    // Keep the theme in sync if it was changed from the popup.
+    const isDark = settings.theme === "dark";
+    document.querySelector("#dark-theme").checked = isDark;
+    applyTheme(isDark ? "dark" : "light");
 }
 
 initThemeControl();
