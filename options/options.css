@@ -65,6 +65,18 @@ h2 {
     color: #555;
 }
 
+#intro code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9em;
+    background-color: #efefef;
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+body.dark #intro code {
+    background-color: #333;
+}
+
 #domain-list {
     list-style: none;
     margin: 0;
@@ -86,7 +98,33 @@ h2 {
 .domain-name {
     grid-area: name;
     font-weight: 600;
+    font-family: inherit;
+    font-size: 1em;
     word-break: break-all;
+    color: inherit;
+    background-color: transparent;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    padding: 3px 6px;
+    margin: -3px -6px;
+    width: 100%;
+    box-sizing: border-box;
+}
+
+.domain-name:hover {
+    border-color: #d5d5d5;
+}
+
+.domain-name:focus {
+    outline: none;
+    border-color: #5a5a8f;
+    background-color: #fff;
+}
+
+.domain-name.invalid,
+.domain-name.invalid:focus {
+    border-color: #c0392b;
+    background-color: #fdecea;
 }
 
 .domain-remove {
@@ -151,6 +189,21 @@ body.dark #skip-dark-sites-note {
 
 body.dark .domain-row {
     border-bottom-color: #3a3a3a;
+}
+
+body.dark .domain-name:hover {
+    border-color: #4a4a4a;
+}
+
+body.dark .domain-name:focus {
+    border-color: #a3a3d4;
+    background-color: #2a2a2a;
+}
+
+body.dark .domain-name.invalid,
+body.dark .domain-name.invalid:focus {
+    border-color: #e06055;
+    background-color: #4a2a28;
 }
 
 body.dark .domain-remove {

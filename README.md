@@ -16,7 +16,24 @@ its brightness, making pages easier on the eyes in dark environments.
   TabShade toolbar icon, so you can see it at a glance without opening the popup.
 - **Preferences page** — from the extension's preferences (about:addons →
   TabShade → Preferences) you can see every domain you have saved a shade level
-  for, adjust each one, or remove it.
+  for, adjust each one, rename it, or remove it.
+- **Wildcard domains** — a saved entry can use `*` as a wildcard so one entry
+  covers many hosts. Edit a domain name on the preferences page to turn it into
+  a pattern:
+  - `*adminer*` — matches any site whose address contains "adminer"
+    (`adminer.dev.corp`, `db-adminer.internal`, …).
+  - `*.google.com` — matches `google.com` and any subdomain (`www.google.com`,
+    `mail.google.com`), but not lookalikes like `notgoogle.com`.
+  - `dbgate.*` — matches `dbgate` with any suffix (`dbgate.internal`,
+    `dbgate.example.com`).
+
+  Handy when you flick between many near-identical hosts (e.g. several `dbgate`
+  or `adminer` database consoles) — one pattern replaces a dozen entries. When
+  several entries match a host, an exact hostname wins over any pattern, and the
+  most specific pattern (the one with the most literal characters) wins over a
+  broader one. Adjusting the slider or using the keyboard shortcuts on a page
+  matched by a pattern writes the change back to that pattern, so it stays a
+  single entry.
 - **Keyboard shortcuts** — adjust the current tab without opening the popup:
   - `Alt+Shift+↑` — more dim (increase the shade level by 5%)
   - `Alt+Shift+↓` — less dim (decrease the shade level by 5%)
@@ -28,8 +45,9 @@ its brightness, making pages easier on the eyes in dark environments.
 - A content script injects a full-page overlay whose opacity corresponds to the
   shade level in effect.
 - On page load the level is resolved in this order: a saved level for the
-  domain takes precedence, otherwise the global default (when "Shade by default"
-  is on), otherwise no shading.
+  domain (matched exactly, or via a wildcard pattern) takes precedence,
+  otherwise the global default (when "Shade by default" is on), otherwise no
+  shading.
 - Settings and saved sites are stored with the WebExtensions `storage.local`
   API, so your choices persist across sessions. Only sites you explicitly save
   are remembered per domain.

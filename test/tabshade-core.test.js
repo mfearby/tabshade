@@ -13,6 +13,11 @@ const {
     levelFromOverlayColor,
     parseColor,
     badgeForLevel,
+    isPattern,
+    patternToRegExp,
+    domainMatchesPattern,
+    patternSpecificity,
+    resolveSavedEntry,
     MAX_OPACITY,
     DARK_LUMINANCE_THRESHOLD,
     SAVED_BADGE_COLOR,
@@ -261,5 +266,166 @@ describe("badgeForLevel", () => {
     it("uses the saved colour only for saved sites", () => {
         expect(badgeForLevel(35, true).color).toBe(SAVED_BADGE_COLOR);
         expect(badgeForLevel(35, false).color).toBe(DEFAULT_BADGE_COLOR);
+    });
+});
+
+describe("isPattern", () => {
+    it("treats keys containing '*' as patterns", () => {
+        expect(isPattern("*adminer*")).toBe(true);
+        expect(isPattern("*.google.com")).toBe(true);
+        expect(isPattern("dbgate-*")).toBe(true);
+    });
+
+    it("treats literal hostnames as non-patterns", () => {
+        expect(isPattern("www.google.com")).toBe(false);
+        expect(isPattern("localhost")).toBe(false);
+    });
+
+    it("returns false for non-strings", () => {
+        expect(isPattern(undefined)).toBe(false);
+        expect(isPattern(null)).toBe(false);
+        expect(isPattern(42)).toBe(false);
+    });
+});
+
+describe("patternToRegExp", () => {
+    it("returns null for non-glob input", () => {
+        expect(patternToRegExp("www.google.com")).toBeNull();
+        expect(patternToRegExp("")).toBeNull();
+        expect(patternToRegExp(null)).toBeNull();
+    });
+
+    it("anchors the whole pattern", () => {
+        const re = patternToRegExp("*adminer*");
+        expect(re.source).toBe("^.*adminer.*$");
+    });
+
+    it("escapes regex metacharacters in the literal parts", () => {
+        // The dots must be literal dots, not 'any char'.
+        const re = patternToRegExp("*.google.com");
+        expect(re.test("www.google.com")).toBe(true);
+        expect(re.test("wwwXgoogleYcom")).toBe(false);
+    });
+
+    it("is case-insensitive", () => {
+        const re = patternToRegExp("*ADMINER*");
+        expect(re.test("db.adminer.net")).toBe(true);
+    });
+});
+
+describe("domainMatchesPattern", () => {
+    it("does a substring match for *text* patterns", () => {
+        expect(domainMatchesPattern("adminer.example.com", "*adminer*")).toBe(true);
+        expect(domainMatchesPattern("db-adminer.internal", "*adminer*")).toBe(true);
+        expect(domainMatchesPattern("adminer.corp.net", "*adminer*")).toBe(true);
+        expect(domainMatchesPattern("dbgate.example.com", "*adminer*")).toBe(false);
+    });
+
+    it("matches subdomains for *.domain patterns without matching lookalikes", () => {
+        expect(domainMatchesPattern("www.google.com", "*.google.com")).toBe(true);
+        expect(domainMatchesPattern("adminer.google.com", "*.google.com")).toBe(true);
+        // No dot before "google" here, so the "\." in the pattern fails.
+        expect(domainMatchesPattern("notgoogle.com", "*.google.com")).toBe(false);
+        // Trailing junk is rejected by the anchor.
+        expect(domainMatchesPattern("www.google.com.evil.net", "*.google.com")).toBe(
+            false
+        );
+    });
+
+    it("supports a trailing wildcard (any suffix)", () => {
+        expect(domainMatchesPattern("dbgate.example.com", "dbgate.*")).toBe(true);
+        expect(domainMatchesPattern("dbgate.internal", "dbgate.*")).toBe(true);
+        expect(domainMatchesPattern("mydbgate.com", "dbgate.*")).toBe(false);
+    });
+
+    it("requires an exact (case-insensitive) match for literal keys", () => {
+        expect(domainMatchesPattern("www.google.com", "www.google.com")).toBe(true);
+        expect(domainMatchesPattern("WWW.GOOGLE.COM", "www.google.com")).toBe(true);
+        expect(domainMatchesPattern("mail.google.com", "www.google.com")).toBe(false);
+    });
+
+    it("returns false for non-string input", () => {
+        expect(domainMatchesPattern(null, "*adminer*")).toBe(false);
+        expect(domainMatchesPattern("adminer.com", null)).toBe(false);
+    });
+});
+
+describe("patternSpecificity", () => {
+    it("ranks literal keys above any pattern", () => {
+        expect(patternSpecificity("www.google.com")).toBe(Number.MAX_SAFE_INTEGER);
+        expect(patternSpecificity("*adminer*")).toBeLessThan(
+            patternSpecificity("www.google.com")
+        );
+    });
+
+    it("ranks patterns by their literal-character count", () => {
+        // More literal characters => more specific.
+        expect(patternSpecificity("*.prod.google.com")).toBeGreaterThan(
+            patternSpecificity("*google*")
+        );
+    });
+
+    it("returns -1 for non-strings", () => {
+        expect(patternSpecificity(null)).toBe(-1);
+    });
+});
+
+describe("resolveSavedEntry", () => {
+    it("returns null when nothing matches", () => {
+        expect(resolveSavedEntry("example.com", {})).toBeNull();
+        expect(resolveSavedEntry("example.com", { "*adminer*": 40 })).toBeNull();
+    });
+
+    it("returns null for invalid input", () => {
+        expect(resolveSavedEntry(null, { "a.com": 10 })).toBeNull();
+        expect(resolveSavedEntry("a.com", null)).toBeNull();
+    });
+
+    it("matches an exact literal key and reports it", () => {
+        expect(resolveSavedEntry("www.google.com", { "www.google.com": 30 })).toEqual({
+            matchedKey: "www.google.com",
+            level: 30,
+        });
+    });
+
+    it("matches a wildcard pattern and reports the pattern as the key", () => {
+        expect(
+            resolveSavedEntry("adminer.corp.net", { "*adminer*": 55 })
+        ).toEqual({ matchedKey: "*adminer*", level: 55 });
+    });
+
+    it("normalises the stored level", () => {
+        expect(resolveSavedEntry("a.com", { "a.com": "150" }).level).toBe(100);
+        expect(resolveSavedEntry("x.adminer.io", { "*adminer*": -5 }).level).toBe(0);
+    });
+
+    it("prefers an exact literal match over any matching pattern", () => {
+        const saved = { "*adminer*": 20, "adminer.prod.com": 70 };
+        expect(resolveSavedEntry("adminer.prod.com", saved)).toEqual({
+            matchedKey: "adminer.prod.com",
+            level: 70,
+        });
+    });
+
+    it("prefers the most specific pattern when several match", () => {
+        const saved = { "*google*": 20, "*.prod.google.com": 65 };
+        expect(resolveSavedEntry("db.prod.google.com", saved)).toEqual({
+            matchedKey: "*.prod.google.com",
+            level: 65,
+        });
+    });
+
+    it("handles the DevOps multi-host case with one pattern", () => {
+        const saved = { "*adminer*": 45 };
+        for (const host of [
+            "adminer.dev.corp",
+            "adminer.staging.corp",
+            "db-adminer.internal.net",
+        ]) {
+            expect(resolveSavedEntry(host, saved)).toEqual({
+                matchedKey: "*adminer*",
+                level: 45,
+            });
+        }
     });
 });

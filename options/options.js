@@ -134,6 +134,36 @@ async function saveLevel(domain, level) {
 }
 
 /**
+ * Rename a saved domain key, preserving its level. Used to turn a literal
+ * hostname (e.g. "www.google.com.au") into a wildcard pattern (e.g.
+ * "*.google.com" or "*adminer*").
+ *
+ * Returns an object describing the outcome:
+ *   { ok: true }                      renamed successfully
+ *   { ok: false, reason: "empty" }    the new name was blank
+ *   { ok: false, reason: "same" }     unchanged (no-op)
+ *   { ok: false, reason: "exists" }   another entry already uses the new name
+ */
+async function renameDomain(oldKey, newKeyRaw) {
+    const newKey = (newKeyRaw || "").trim();
+    if (!newKey) {
+        return { ok: false, reason: "empty" };
+    }
+    if (newKey === oldKey) {
+        return { ok: false, reason: "same" };
+    }
+    const domains = await getShadedDomains();
+    if (Object.prototype.hasOwnProperty.call(domains, newKey)) {
+        return { ok: false, reason: "exists" };
+    }
+    const level = normalizeLevel(domains[oldKey]);
+    delete domains[oldKey];
+    domains[newKey] = level;
+    await browser.storage.local.set({ [STORAGE_KEY]: domains });
+    return { ok: true };
+}
+
+/**
  * Build the DOM for a single domain row.
  */
 function createDomainRow(domain, level) {
@@ -141,9 +171,20 @@ function createDomainRow(domain, level) {
     row.className = "domain-row";
     row.dataset.domain = domain;
 
-    const name = document.createElement("span");
+    const name = document.createElement("input");
     name.className = "domain-name";
-    name.textContent = domain;
+    name.type = "text";
+    name.value = domain;
+    name.spellcheck = false;
+    name.setAttribute("autocomplete", "off");
+    name.setAttribute("autocapitalize", "off");
+    name.setAttribute(
+        "aria-label",
+        "Domain or wildcard pattern (use * to match, e.g. *adminer* or *.google.com)"
+    );
+    name.title =
+        'Edit the domain. Use * as a wildcard, e.g. *adminer* matches any host ' +
+        'containing "adminer", and *.google.com matches google.com subdomains.';
 
     const remove = document.createElement("button");
     remove.className = "domain-remove";
@@ -181,6 +222,60 @@ function createDomainRow(domain, level) {
         removeRow(row);
     });
 
+    // Commit a domain rename on blur or Enter. On success we re-render the
+    // whole list so the row picks up the new key everywhere (sort order, the
+    // closures used by the slider/remove handlers) without stale state. On
+    // failure we restore the previous value and flag the field.
+    //
+    // `committing` guards against re-entrancy and stale re-commits. Pressing
+    // Enter blurs the field, and render() (on success) removes this input node
+    // while it is focused, which itself fires another blur on the old node —
+    // both would call commitRename again on this stale closure. Without the
+    // guard, two commits could interleave, each reading the pre-rename storage
+    // map and writing the new key, leaving a duplicate entry. On failure we
+    // reset the flag so the user can retry; on success we leave it latched
+    // because the row is about to be discarded.
+    let committing = false;
+    async function commitRename() {
+        if (committing) {
+            return;
+        }
+        committing = true;
+        const result = await renameDomain(domain, name.value);
+        if (result.ok) {
+            // Leave `committing` latched: this row/input is being replaced by
+            // render(), and the removal will fire a stray blur we must ignore.
+            await render();
+            return;
+        }
+        name.classList.remove("invalid");
+        if (result.reason === "same" || result.reason === "empty") {
+            // Nothing changed (or blank): quietly restore the original name.
+            name.value = domain;
+        } else if (result.reason === "exists") {
+            // Collision with another entry: keep the typed text but flag it so
+            // the user can fix it, and explain why.
+            name.classList.add("invalid");
+            name.title = "Another saved entry already uses that name.";
+        }
+        committing = false;
+    }
+
+    name.addEventListener("blur", commitRename);
+    name.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+            e.preventDefault();
+            // Commit directly. The guard in commitRename makes the stray blur
+            // that follows (from render() removing this focused node) a no-op.
+            commitRename();
+        } else if (e.key === "Escape") {
+            e.preventDefault();
+            name.value = domain;
+            name.classList.remove("invalid");
+            name.blur();
+        }
+    });
+
     control.appendChild(slider);
     control.appendChild(value);
 
@@ -211,14 +306,42 @@ function updateEmptyState() {
 
 /**
  * Render the full list of domains from storage.
+ *
+ * Renders are serialized. `render()` reads storage asynchronously, so two
+ * overlapping calls (e.g. the explicit one after a rename plus the one the
+ * storage-change listener fires) could each clear the list and then both
+ * append the same rows, producing duplicates. `renderInFlight` ensures only
+ * one render runs at a time; if a render is requested while one is running,
+ * `renderPending` schedules exactly one more pass afterwards so the final
+ * state always reflects the latest storage.
  */
+let renderInFlight = false;
+let renderPending = false;
 async function render() {
-    const list = document.querySelector("#domain-list");
-    list.textContent = "";
+    if (renderInFlight) {
+        renderPending = true;
+        return;
+    }
+    renderInFlight = true;
+    try {
+        do {
+            renderPending = false;
+            await renderOnce();
+        } while (renderPending);
+    } finally {
+        renderInFlight = false;
+    }
+}
 
+/**
+ * Perform a single render pass: clear the list and rebuild it from storage.
+ */
+async function renderOnce() {
     const domains = await getShadedDomains();
     const names = Object.keys(domains).sort();
 
+    const list = document.querySelector("#domain-list");
+    list.textContent = "";
     for (const domain of names) {
         list.appendChild(createDomainRow(domain, normalizeLevel(domains[domain])));
     }
@@ -248,8 +371,14 @@ browser.storage.onChanged.addListener((changes, area) => {
 
     if (changes[STORAGE_KEY] && !document.hidden) {
         // Only re-render when the options page is not the active editor to
-        // avoid yanking a slider out from under the user mid-drag.
-        if (document.activeElement && document.activeElement.type === "range") {
+        // avoid yanking a slider out from under the user mid-drag, or
+        // discarding an in-progress domain-name edit.
+        const activeEl = document.activeElement;
+        if (
+            activeEl &&
+            (activeEl.type === "range" ||
+                activeEl.classList.contains("domain-name"))
+        ) {
             return;
         }
         render();

@@ -35,6 +35,7 @@
         normalizeLevel,
         normalizeSettings,
         resolveLevel,
+        resolveSavedEntry,
         parseColor,
         isDarkColor,
         overlayColorForLevel,
@@ -95,51 +96,70 @@
     }
 
     /**
-     * Whether the current domain has an explicitly saved shade level.
+     * Resolve the saved entry (if any) that applies to the given domain,
+     * matching exact hostnames first and then wildcard patterns such as
+     * "*adminer*" or "*.google.com". Returns { matchedKey, level } or null.
+     *
+     * matchedKey is the storage key that matched — possibly a pattern — and is
+     * what level edits should be written back to, so adjusting the slider on
+     * "adminer.corp.net" updates the "*adminer*" entry rather than creating a
+     * new literal entry for that one host.
+     */
+    async function resolveEntryForDomain(domain) {
+        if (!domain) {
+            return null;
+        }
+        const domains = await getShadedDomains();
+        return resolveSavedEntry(domain, domains);
+    }
+
+    /**
+     * Whether the current domain is covered by a saved entry (exact or
+     * wildcard).
      */
     async function isDomainSaved(domain) {
-        if (!domain) {
-            return false;
-        }
-        const domains = await getShadedDomains();
-        return Object.prototype.hasOwnProperty.call(domains, domain);
+        return (await resolveEntryForDomain(domain)) !== null;
     }
 
     /**
-     * Read the saved shade level for the given domain, or 0 if it isn't saved.
+     * Read the effective saved shade level for the given domain (via exact or
+     * wildcard match), or 0 if nothing matches.
      */
     async function getSavedLevel(domain) {
-        if (!domain) {
-            return 0;
-        }
-        const domains = await getShadedDomains();
-        return normalizeLevel(domains[domain]);
+        const entry = await resolveEntryForDomain(domain);
+        return entry ? normalizeLevel(entry.level) : 0;
     }
 
     /**
-     * Save a shade level for the current domain in local storage so it appears
-     * in the preferences screen and is applied automatically on future visits.
+     * Save a shade level under a specific storage key (which may be a wildcard
+     * pattern) in local storage so it appears in the preferences screen and is
+     * applied automatically on future visits.
      */
-    async function saveDomain(domain, level) {
-        if (!domain) {
+    async function saveEntry(key, level) {
+        if (!key) {
             return;
         }
         const domains = await getShadedDomains();
-        domains[domain] = normalizeLevel(level);
+        domains[key] = normalizeLevel(level);
         await browser.storage.local.set({ [STORAGE_KEY]: domains });
     }
 
     /**
-     * Remove the current domain from the saved list. The page falls back to the
-     * "shade by default" behaviour (or no shading) afterwards.
+     * Remove the saved entry (exact or matched pattern) that applies to the
+     * given domain. The page falls back to the "shade by default" behaviour (or
+     * no shading) afterwards.
      */
     async function unsaveDomain(domain) {
         if (!domain) {
             return;
         }
+        const entry = await resolveEntryForDomain(domain);
+        if (!entry) {
+            return;
+        }
         const domains = await getShadedDomains();
-        if (Object.prototype.hasOwnProperty.call(domains, domain)) {
-            delete domains[domain];
+        if (Object.prototype.hasOwnProperty.call(domains, entry.matchedKey)) {
+            delete domains[entry.matchedKey];
             await browser.storage.local.set({ [STORAGE_KEY]: domains });
         }
     }
@@ -182,8 +202,17 @@
      * Notify the background script that this tab's shade level changed, so it
      * can update the badge shown on the toolbar icon. Includes whether this
      * domain is saved, so the badge can be coloured differently.
+     *
+     * Skips the notification while the document is being prerendered by Chrome:
+     * a prerendered page is a hidden, not-yet-active document, and letting it
+     * report its level would overwrite the badge of the tab the user is
+     * actually looking at. When the prerender is activated the page re-notifies
+     * as a normal visible document (see the prerenderingchange handler).
      */
     async function notifyLevelChanged(level) {
+        if (document.prerendering === true) {
+            return;
+        }
         try {
             await browser.runtime.sendMessage({
                 command: "levelChanged",
@@ -196,15 +225,19 @@
     }
 
     /**
-     * Change the current shade level, and if this domain is saved, persist the
-     * new level too. Used by both the popup slider and keyboard shortcuts.
+     * Change the current shade level, and if this domain is covered by a saved
+     * entry, persist the new level to that same entry. When the match came from
+     * a wildcard pattern (e.g. "*adminer*"), the level is written back to the
+     * pattern key, not the current hostname — so one pattern stays a single
+     * entry instead of spawning a literal copy per host visited.
      */
     async function changeLevel(level) {
         const normalized = normalizeLevel(level);
         applyLevel(normalized);
         const domain = getDomain();
-        if (await isDomainSaved(domain)) {
-            await saveDomain(domain, normalized);
+        const entry = await resolveEntryForDomain(domain);
+        if (entry) {
+            await saveEntry(entry.matchedKey, normalized);
         }
     }
 
@@ -220,9 +253,18 @@
      * Save the given level for the current domain, then apply it. Storage is
      * written first so the badge notification (fired from applyLevel) sees the
      * domain as saved and colours the badge accordingly.
+     *
+     * If the domain is already covered by a saved entry — including a wildcard
+     * pattern such as "*.microsoft.com" — the level is written back to that
+     * same entry's key, so adjusting the popup slider on "support.microsoft.com"
+     * updates the pattern rather than spawning a new literal entry. Only when
+     * no entry matches do we create a literal entry for the current hostname.
      */
     async function saveSite(level) {
-        await saveDomain(getDomain(), level);
+        const domain = getDomain();
+        const entry = await resolveEntryForDomain(domain);
+        const key = entry ? entry.matchedKey : domain;
+        await saveEntry(key, level);
         applyLevel(level);
     }
 
@@ -284,6 +326,23 @@
      */
     async function applyOnLoad() {
         applyLevel(await resolveInitialLevel());
+    }
+
+    /**
+     * When a prerendered document is activated (the user navigates to a page
+     * Chrome preloaded in the background), notifyLevelChanged was suppressed
+     * during prerendering, so the badge still reflects the previous page. Fire
+     * a fresh notification now that this document is the visible, active tab so
+     * the badge catches up without needing a manual tab switch.
+     */
+    if (document.prerendering === true) {
+        document.addEventListener(
+            "prerenderingchange",
+            () => {
+                notifyLevelChanged(getCurrentLevel());
+            },
+            { once: true }
+        );
     }
 
     /**

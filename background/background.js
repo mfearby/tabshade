@@ -12,7 +12,9 @@ const { badgeForLevel } = globalThis.TabShade;
  * level comes from a saved site.
  */
 function setBadgeForTab(tabId, level, saved) {
-    if (typeof tabId !== "number") {
+    if (typeof tabId !== "number" || tabId < 0) {
+        // Chrome uses tabId -1 (TAB_ID_NONE) for messages from prerendered or
+        // otherwise non-tab contexts; setBadgeText rejects those, so skip them.
         return;
     }
     const { text, color } = badgeForLevel(level, saved);
@@ -46,6 +48,10 @@ async function refreshBadgeForTab(tabId) {
  */
 browser.runtime.onMessage.addListener((message, sender) => {
     if (message && message.command === "levelChanged" && sender.tab) {
+        // The content script suppresses level notifications while a document is
+        // being prerendered by Chrome, so a hidden prerendered page can't
+        // overwrite the active tab's badge. The tabId guard in setBadgeForTab is
+        // the backstop for messages that arrive with no real tab id (-1).
         setBadgeForTab(sender.tab.id, message.level, !!message.saved);
     }
 });
