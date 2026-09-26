@@ -135,8 +135,8 @@ async function saveLevel(domain, level) {
 
 /**
  * Rename a saved domain key, preserving its level. Used to turn a literal
- * hostname (e.g. "www.google.com.au") into a wildcard pattern (e.g.
- * "*.google.com" or "*adminer*").
+ * hostname (e.g. "www.amazon.com.au") into a wildcard pattern (e.g.
+ * "*.amazon.com" or "*whatever*").
  *
  * Returns an object describing the outcome:
  *   { ok: true }                      renamed successfully
@@ -180,11 +180,11 @@ function createDomainRow(domain, level) {
     name.setAttribute("autocapitalize", "off");
     name.setAttribute(
         "aria-label",
-        "Domain or wildcard pattern (use * to match, e.g. *adminer* or *.google.com)"
+        "Domain or wildcard pattern (use * to match, e.g. *whatever* or *.amazon.com)"
     );
     name.title =
-        'Edit the domain. Use * as a wildcard, e.g. *adminer* matches any host ' +
-        'containing "adminer", and *.google.com matches google.com subdomains.';
+        'Edit the domain. Use * as a wildcard, e.g. *whatever* matches any host ' +
+        'containing "whatever", and *.amazon.com matches amazon.com subdomains.';
 
     const remove = document.createElement("button");
     remove.className = "domain-remove";

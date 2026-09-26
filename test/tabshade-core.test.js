@@ -271,13 +271,13 @@ describe("badgeForLevel", () => {
 
 describe("isPattern", () => {
     it("treats keys containing '*' as patterns", () => {
-        expect(isPattern("*adminer*")).toBe(true);
-        expect(isPattern("*.google.com")).toBe(true);
-        expect(isPattern("dbgate-*")).toBe(true);
+        expect(isPattern("*whatever*")).toBe(true);
+        expect(isPattern("*.amazon.com")).toBe(true);
+        expect(isPattern("mysite-*")).toBe(true);
     });
 
     it("treats literal hostnames as non-patterns", () => {
-        expect(isPattern("www.google.com")).toBe(false);
+        expect(isPattern("www.amazon.com")).toBe(false);
         expect(isPattern("localhost")).toBe(false);
     });
 
@@ -290,78 +290,78 @@ describe("isPattern", () => {
 
 describe("patternToRegExp", () => {
     it("returns null for non-glob input", () => {
-        expect(patternToRegExp("www.google.com")).toBeNull();
+        expect(patternToRegExp("www.amazon.com")).toBeNull();
         expect(patternToRegExp("")).toBeNull();
         expect(patternToRegExp(null)).toBeNull();
     });
 
     it("anchors the whole pattern", () => {
-        const re = patternToRegExp("*adminer*");
-        expect(re.source).toBe("^.*adminer.*$");
+        const re = patternToRegExp("*whatever*");
+        expect(re.source).toBe("^.*whatever.*$");
     });
 
     it("escapes regex metacharacters in the literal parts", () => {
         // The dots must be literal dots, not 'any char'.
-        const re = patternToRegExp("*.google.com");
-        expect(re.test("www.google.com")).toBe(true);
-        expect(re.test("wwwXgoogleYcom")).toBe(false);
+        const re = patternToRegExp("*.amazon.com");
+        expect(re.test("www.amazon.com")).toBe(true);
+        expect(re.test("wwwXamazonYcom")).toBe(false);
     });
 
     it("is case-insensitive", () => {
-        const re = patternToRegExp("*ADMINER*");
-        expect(re.test("db.adminer.net")).toBe(true);
+        const re = patternToRegExp("*WHATEVER*");
+        expect(re.test("db.whatever.net")).toBe(true);
     });
 });
 
 describe("domainMatchesPattern", () => {
     it("does a substring match for *text* patterns", () => {
-        expect(domainMatchesPattern("adminer.example.com", "*adminer*")).toBe(true);
-        expect(domainMatchesPattern("db-adminer.internal", "*adminer*")).toBe(true);
-        expect(domainMatchesPattern("adminer.corp.net", "*adminer*")).toBe(true);
-        expect(domainMatchesPattern("dbgate.example.com", "*adminer*")).toBe(false);
+        expect(domainMatchesPattern("whatever.example.com", "*whatever*")).toBe(true);
+        expect(domainMatchesPattern("db-whatever.internal", "*whatever*")).toBe(true);
+        expect(domainMatchesPattern("whatever.corp.net", "*whatever*")).toBe(true);
+        expect(domainMatchesPattern("mysite.example.com", "*whatever*")).toBe(false);
     });
 
     it("matches subdomains for *.domain patterns without matching lookalikes", () => {
-        expect(domainMatchesPattern("www.google.com", "*.google.com")).toBe(true);
-        expect(domainMatchesPattern("adminer.google.com", "*.google.com")).toBe(true);
-        // No dot before "google" here, so the "\." in the pattern fails.
-        expect(domainMatchesPattern("notgoogle.com", "*.google.com")).toBe(false);
+        expect(domainMatchesPattern("www.amazon.com", "*.amazon.com")).toBe(true);
+        expect(domainMatchesPattern("whatever.amazon.com", "*.amazon.com")).toBe(true);
+        // No dot before "amazon" here, so the "\." in the pattern fails.
+        expect(domainMatchesPattern("notamazon.com", "*.amazon.com")).toBe(false);
         // Trailing junk is rejected by the anchor.
-        expect(domainMatchesPattern("www.google.com.evil.net", "*.google.com")).toBe(
+        expect(domainMatchesPattern("www.amazon.com.evil.net", "*.amazon.com")).toBe(
             false
         );
     });
 
     it("supports a trailing wildcard (any suffix)", () => {
-        expect(domainMatchesPattern("dbgate.example.com", "dbgate.*")).toBe(true);
-        expect(domainMatchesPattern("dbgate.internal", "dbgate.*")).toBe(true);
-        expect(domainMatchesPattern("mydbgate.com", "dbgate.*")).toBe(false);
+        expect(domainMatchesPattern("mysite.example.com", "mysite.*")).toBe(true);
+        expect(domainMatchesPattern("mysite.internal", "mysite.*")).toBe(true);
+        expect(domainMatchesPattern("mymysite.com", "mysite.*")).toBe(false);
     });
 
     it("requires an exact (case-insensitive) match for literal keys", () => {
-        expect(domainMatchesPattern("www.google.com", "www.google.com")).toBe(true);
-        expect(domainMatchesPattern("WWW.GOOGLE.COM", "www.google.com")).toBe(true);
-        expect(domainMatchesPattern("mail.google.com", "www.google.com")).toBe(false);
+        expect(domainMatchesPattern("www.amazon.com", "www.amazon.com")).toBe(true);
+        expect(domainMatchesPattern("WWW.AMAZON.COM", "www.amazon.com")).toBe(true);
+        expect(domainMatchesPattern("mail.amazon.com", "www.amazon.com")).toBe(false);
     });
 
     it("returns false for non-string input", () => {
-        expect(domainMatchesPattern(null, "*adminer*")).toBe(false);
-        expect(domainMatchesPattern("adminer.com", null)).toBe(false);
+        expect(domainMatchesPattern(null, "*whatever*")).toBe(false);
+        expect(domainMatchesPattern("whatever.com", null)).toBe(false);
     });
 });
 
 describe("patternSpecificity", () => {
     it("ranks literal keys above any pattern", () => {
-        expect(patternSpecificity("www.google.com")).toBe(Number.MAX_SAFE_INTEGER);
-        expect(patternSpecificity("*adminer*")).toBeLessThan(
-            patternSpecificity("www.google.com")
+        expect(patternSpecificity("www.amazon.com")).toBe(Number.MAX_SAFE_INTEGER);
+        expect(patternSpecificity("*whatever*")).toBeLessThan(
+            patternSpecificity("www.amazon.com")
         );
     });
 
     it("ranks patterns by their literal-character count", () => {
         // More literal characters => more specific.
-        expect(patternSpecificity("*.prod.google.com")).toBeGreaterThan(
-            patternSpecificity("*google*")
+        expect(patternSpecificity("*.prod.amazon.com")).toBeGreaterThan(
+            patternSpecificity("*whatever*")
         );
     });
 
@@ -373,7 +373,7 @@ describe("patternSpecificity", () => {
 describe("resolveSavedEntry", () => {
     it("returns null when nothing matches", () => {
         expect(resolveSavedEntry("example.com", {})).toBeNull();
-        expect(resolveSavedEntry("example.com", { "*adminer*": 40 })).toBeNull();
+        expect(resolveSavedEntry("example.com", { "*whatever*": 40 })).toBeNull();
     });
 
     it("returns null for invalid input", () => {
@@ -382,48 +382,48 @@ describe("resolveSavedEntry", () => {
     });
 
     it("matches an exact literal key and reports it", () => {
-        expect(resolveSavedEntry("www.google.com", { "www.google.com": 30 })).toEqual({
-            matchedKey: "www.google.com",
+        expect(resolveSavedEntry("www.amazon.com", { "www.amazon.com": 30 })).toEqual({
+            matchedKey: "www.amazon.com",
             level: 30,
         });
     });
 
     it("matches a wildcard pattern and reports the pattern as the key", () => {
         expect(
-            resolveSavedEntry("adminer.corp.net", { "*adminer*": 55 })
-        ).toEqual({ matchedKey: "*adminer*", level: 55 });
+            resolveSavedEntry("whatever.corp.net", { "*whatever*": 55 })
+        ).toEqual({ matchedKey: "*whatever*", level: 55 });
     });
 
     it("normalises the stored level", () => {
         expect(resolveSavedEntry("a.com", { "a.com": "150" }).level).toBe(100);
-        expect(resolveSavedEntry("x.adminer.io", { "*adminer*": -5 }).level).toBe(0);
+        expect(resolveSavedEntry("x.whatever.io", { "*whatever*": -5 }).level).toBe(0);
     });
 
     it("prefers an exact literal match over any matching pattern", () => {
-        const saved = { "*adminer*": 20, "adminer.prod.com": 70 };
-        expect(resolveSavedEntry("adminer.prod.com", saved)).toEqual({
-            matchedKey: "adminer.prod.com",
+        const saved = { "*whatever*": 20, "whatever.prod.com": 70 };
+        expect(resolveSavedEntry("whatever.prod.com", saved)).toEqual({
+            matchedKey: "whatever.prod.com",
             level: 70,
         });
     });
 
     it("prefers the most specific pattern when several match", () => {
-        const saved = { "*google*": 20, "*.prod.google.com": 65 };
-        expect(resolveSavedEntry("db.prod.google.com", saved)).toEqual({
-            matchedKey: "*.prod.google.com",
+        const saved = { "*whatever*": 20, "*.prod.amazon.com": 65 };
+        expect(resolveSavedEntry("db.prod.amazon.com", saved)).toEqual({
+            matchedKey: "*.prod.amazon.com",
             level: 65,
         });
     });
 
     it("handles the DevOps multi-host case with one pattern", () => {
-        const saved = { "*adminer*": 45 };
+        const saved = { "*whatever*": 45 };
         for (const host of [
-            "adminer.dev.corp",
-            "adminer.staging.corp",
-            "db-adminer.internal.net",
+            "whatever.dev.corp",
+            "whatever.staging.corp",
+            "db-whatever.internal.net",
         ]) {
             expect(resolveSavedEntry(host, saved)).toEqual({
-                matchedKey: "*adminer*",
+                matchedKey: "*whatever*",
                 level: 45,
             });
         }

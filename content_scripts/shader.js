@@ -98,11 +98,11 @@
     /**
      * Resolve the saved entry (if any) that applies to the given domain,
      * matching exact hostnames first and then wildcard patterns such as
-     * "*adminer*" or "*.google.com". Returns { matchedKey, level } or null.
+     * "*whatever*" or "*.amazon.com". Returns { matchedKey, level } or null.
      *
      * matchedKey is the storage key that matched — possibly a pattern — and is
      * what level edits should be written back to, so adjusting the slider on
-     * "adminer.corp.net" updates the "*adminer*" entry rather than creating a
+     * "whatever.corp.net" updates the "*whatever*" entry rather than creating a
      * new literal entry for that one host.
      */
     async function resolveEntryForDomain(domain) {
@@ -227,7 +227,7 @@
     /**
      * Change the current shade level, and if this domain is covered by a saved
      * entry, persist the new level to that same entry. When the match came from
-     * a wildcard pattern (e.g. "*adminer*"), the level is written back to the
+     * a wildcard pattern (e.g. "*whatever*"), the level is written back to the
      * pattern key, not the current hostname — so one pattern stays a single
      * entry instead of spawning a literal copy per host visited.
      */
@@ -344,6 +344,21 @@
             { once: true }
         );
     }
+
+    /**
+     * When the user navigates Back/Forward, Chrome (and Firefox) may restore
+     * the page from the back/forward cache: the document — including our
+     * overlay — is resurrected intact, but the content script does not re-run,
+     * so applyOnLoad/notifyLevelChanged never fire and the toolbar badge is
+     * left blank. A pageshow event with persisted === true signals a bfcache
+     * restore; re-notify so the badge reflects the still-applied level without
+     * needing a manual tab switch.
+     */
+    window.addEventListener("pageshow", (event) => {
+        if (event.persisted) {
+            notifyLevelChanged(getCurrentLevel());
+        }
+    });
 
     /**
      * Listen for messages from the popup.

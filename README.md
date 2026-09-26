@@ -20,15 +20,15 @@ its brightness, making pages easier on the eyes in dark environments.
 - **Wildcard domains** — a saved entry can use `*` as a wildcard so one entry
   covers many hosts. Edit a domain name on the preferences page to turn it into
   a pattern:
-  - `*adminer*` — matches any site whose address contains "adminer"
-    (`adminer.dev.corp`, `db-adminer.internal`, …).
-  - `*.google.com` — matches `google.com` and any subdomain (`www.google.com`,
-    `mail.google.com`), but not lookalikes like `notgoogle.com`.
-  - `dbgate.*` — matches `dbgate` with any suffix (`dbgate.internal`,
-    `dbgate.example.com`).
+  - `*whatever*` — matches any site whose address contains "whatever"
+    (`whatever.dev.corp`, `db-whatever.internal`, …).
+  - `*.amazon.com` — matches `amazon.com` and any subdomain (`www.amazon.com`,
+    `mail.amazon.com`), but not lookalikes like `notamazon.com`.
+  - `mysite.*` — matches `mysite` with any suffix (`mysite.internal`,
+    `mysite.example.com`).
 
-  Handy when you flick between many near-identical hosts (e.g. several `dbgate`
-  or `adminer` database consoles) — one pattern replaces a dozen entries. When
+  Handy when you flick between many near-identical hosts (e.g. several `mysite`
+  or `whatever` database consoles) — one pattern replaces a dozen entries. When
   several entries match a host, an exact hostname wins over any pattern, and the
   most specific pattern (the one with the most literal characters) wins over a
   broader one. Adjusting the slider or using the keyboard shortcuts on a page
