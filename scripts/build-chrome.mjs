@@ -40,6 +40,7 @@ const SOURCE_ENTRIES = [
     "background",
     "content_scripts",
     "icons",
+    "lib",
     "options",
     "popup",
 ];
@@ -123,13 +124,17 @@ async function main() {
         `<script src="../${POLYFILL_NAME}"></script>\n        <script src="options.js"></script>`
     );
 
-    // 6. The service worker must load the polyfill before it runs. importScripts
-    //    resolves relative to the extension root, so an absolute path is safest.
+    // 6. The service worker must load the polyfill (provides `browser`) and the
+    //    shared core (provides the TabShade global) before its own code runs.
+    //    importScripts resolves relative to the extension root, so absolute
+    //    paths are safest. The polyfill comes first so `browser` is available;
+    //    the core is independent but loaded here too since background.js reads
+    //    globalThis.TabShade at the top level.
     const bgFile = path.join(distDir, "background", "background.js");
     const bgSource = await fs.readFile(bgFile, "utf8");
     await fs.writeFile(
         bgFile,
-        `importScripts("/${POLYFILL_NAME}");\n\n${bgSource}`,
+        `importScripts("/${POLYFILL_NAME}", "/lib/tabshade-core.js");\n\n${bgSource}`,
         "utf8"
     );
 

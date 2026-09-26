@@ -10,7 +10,7 @@
   },
   "permissions": ["activeTab", "scripting", "storage"],
   "background": {
-    "scripts": ["background/background.js"]
+    "scripts": ["lib/tabshade-core.js", "background/background.js"]
   },
   "options_ui": {
     "page": "options/options.html"
@@ -38,7 +38,7 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["content_scripts/shader.js"],
+      "js": ["lib/tabshade-core.js", "content_scripts/shader.js"],
       "run_at": "document_idle"
     }
   ],

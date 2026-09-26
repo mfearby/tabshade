@@ -1,5 +1,7 @@
-const STORAGE_KEY = "shadedDomains";
 const SETTINGS_KEY = "settings";
+
+// Shared pure helpers (see lib/tabshade-core.js), loaded before this script.
+const { normalizeLevel, normalizeSettings } = globalThis.TabShade;
 
 /**
  * Get the currently active tab in the current window.
@@ -20,28 +22,11 @@ function reportError(error) {
 }
 
 /**
- * Clamp a shade level to the valid 0-100 range and coerce it to a number.
- */
-function normalizeLevel(level) {
-    const n = Number(level);
-    if (!Number.isFinite(n)) {
-        return 0;
-    }
-    return Math.max(0, Math.min(100, Math.round(n)));
-}
-
-/**
  * Read the global settings (shade by default + default level) from storage.
  */
 async function getSettings() {
     const result = await browser.storage.local.get(SETTINGS_KEY);
-    const stored = result[SETTINGS_KEY];
-    return {
-        shadeByDefault: !!(stored && stored.shadeByDefault),
-        defaultLevel: normalizeLevel(stored && stored.defaultLevel),
-        skipDarkSites: !!(stored && stored.skipDarkSites),
-        theme: stored && stored.theme === "dark" ? "dark" : "light",
-    };
+    return normalizeSettings(result[SETTINGS_KEY]);
 }
 
 /**
@@ -237,9 +222,13 @@ function reportExecuteScriptError(error) {
     try {
         const tab = await getActiveTab();
 
+        // Inject the shared core before the content script, since shader.js
+        // reads globalThis.TabShade at the top. The manifest content_scripts
+        // entry loads both on page load, but this programmatic injection (for
+        // pages already open when the popup is first used) must include both.
         await browser.scripting.executeScript({
             target: { tabId: tab.id },
-            files: ["/content_scripts/shader.js"],
+            files: ["/lib/tabshade-core.js", "/content_scripts/shader.js"],
         });
 
         listenForDefaultControls();

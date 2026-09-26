@@ -3,12 +3,8 @@
  * level of the active tab.
  */
 
-/**
- * Badge colours: a medium yellow when the level comes from a saved site, and
- * the default blue-grey otherwise (e.g. a "shade by default" level).
- */
-const SAVED_BADGE_COLOR = "#fdeaaf";
-const DEFAULT_BADGE_COLOR = "#5a5a8f";
+// Shared pure helpers (see lib/tabshade-core.js), loaded before this script.
+const { badgeForLevel } = globalThis.TabShade;
 
 /**
  * Set (or clear) the badge for a given tab. A level of 0 clears the badge;
@@ -19,12 +15,9 @@ function setBadgeForTab(tabId, level, saved) {
     if (typeof tabId !== "number") {
         return;
     }
-    const text = level > 0 ? `${level}` : "";
+    const { text, color } = badgeForLevel(level, saved);
     browser.action.setBadgeText({ tabId, text });
-    browser.action.setBadgeBackgroundColor({
-        tabId,
-        color: saved ? SAVED_BADGE_COLOR : DEFAULT_BADGE_COLOR,
-    });
+    browser.action.setBadgeBackgroundColor({ tabId, color });
 }
 
 /**

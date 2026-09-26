@@ -1,6 +1,9 @@
 const STORAGE_KEY = "shadedDomains";
 const SETTINGS_KEY = "settings";
 
+// Shared pure helper (see lib/tabshade-core.js), loaded before this script.
+const { normalizeLevel } = globalThis.TabShade;
+
 /**
  * Read the global settings object from storage, preserving unknown fields.
  */
@@ -103,17 +106,6 @@ async function initShadingControls() {
     skipDark.addEventListener("change", async () => {
         await updateSettings({ skipDarkSites: skipDark.checked });
     });
-}
-
-/**
- * Clamp a shade level to the valid 0-100 range and coerce it to a number.
- */
-function normalizeLevel(level) {
-    const n = Number(level);
-    if (!Number.isFinite(n)) {
-        return 0;
-    }
-    return Math.max(0, Math.min(100, Math.round(n)));
 }
 
 /**

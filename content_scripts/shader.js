@@ -19,12 +19,6 @@
     const SETTINGS_KEY = "settings";
 
     /**
-     * The maximum opacity the overlay reaches at 100%. Kept below 1 so a fully
-     * shaded page is still faintly visible rather than completely black.
-     */
-    const MAX_OPACITY = 0.9;
-
-    /**
      * How much the keyboard shortcuts change the shade level per press.
      */
     const STEP = 5;
@@ -35,23 +29,24 @@
      */
     const FALLBACK_LEVEL = 20;
 
+    // Shared pure helpers (see lib/tabshade-core.js), loaded as a classic
+    // script before this one and exposed on the TabShade global.
+    const {
+        normalizeLevel,
+        normalizeSettings,
+        resolveLevel,
+        parseColor,
+        isDarkColor,
+        overlayColorForLevel,
+        levelFromOverlayColor,
+    } = globalThis.TabShade;
+
     /**
      * Get the current page's domain (hostname). Returns null for pages that
      * don't have a meaningful hostname (e.g. about: pages).
      */
     function getDomain() {
         return window.location.hostname || null;
-    }
-
-    /**
-     * Clamp a shade level to the valid 0-100 range and coerce it to a number.
-     */
-    function normalizeLevel(level) {
-        const n = Number(level);
-        if (!Number.isFinite(n)) {
-            return 0;
-        }
-        return Math.max(0, Math.min(100, Math.round(n)));
     }
 
     /**
@@ -69,35 +64,7 @@
      */
     async function getSettings() {
         const result = await browser.storage.local.get(SETTINGS_KEY);
-        const stored = result[SETTINGS_KEY];
-        return {
-            shadeByDefault: !!(stored && stored.shadeByDefault),
-            defaultLevel: normalizeLevel(stored && stored.defaultLevel),
-            skipDarkSites: !!(stored && stored.skipDarkSites),
-        };
-    }
-
-    /**
-     * Parse a CSS color string (as returned by getComputedStyle, e.g.
-     * "rgb(20, 20, 20)" or "rgba(0, 0, 0, 0.5)") into {r, g, b, a}, or null if
-     * it can't be understood.
-     */
-    function parseColor(color) {
-        if (!color) {
-            return null;
-        }
-        const match = color.match(
-            /rgba?\(\s*([\d.]+)[,\s]+([\d.]+)[,\s]+([\d.]+)(?:[,\s/]+([\d.]+))?\s*\)/i
-        );
-        if (!match) {
-            return null;
-        }
-        return {
-            r: parseFloat(match[1]),
-            g: parseFloat(match[2]),
-            b: parseFloat(match[3]),
-            a: match[4] !== undefined ? parseFloat(match[4]) : 1,
-        };
+        return normalizeSettings(result[SETTINGS_KEY]);
     }
 
     /**
@@ -120,19 +87,11 @@
     }
 
     /**
-     * The perceived-luminance threshold (0-255) below which a page background
-     * is considered "dark". Around 40% brightness.
-     */
-    const DARK_LUMINANCE_THRESHOLD = 110;
-
-    /**
-     * Decide whether the current page already uses a dark background, using the
-     * standard perceived-luminance formula weighted for human vision.
+     * Decide whether the current page already uses a dark background.
      */
     function isPageDark() {
         const { r, g, b } = getPageBackgroundColor();
-        const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
-        return luminance < DARK_LUMINANCE_THRESHOLD;
+        return isDarkColor(r, g, b);
     }
 
     /**
@@ -215,8 +174,7 @@
             document.body.appendChild(overlay);
         }
 
-        const opacity = (normalized / 100) * MAX_OPACITY;
-        overlay.style.backgroundColor = `rgba(0, 0, 0, ${opacity})`;
+        overlay.style.backgroundColor = overlayColorForLevel(normalized);
         notifyLevelChanged(normalized);
     }
 
@@ -308,20 +266,16 @@
      */
     async function resolveInitialLevel() {
         const domain = getDomain();
-        if (await isDomainSaved(domain)) {
-            return getSavedLevel(domain);
-        }
+        const isSaved = await isDomainSaved(domain);
         const settings = await getSettings();
-        if (settings.shadeByDefault) {
-            // Leave already-dark pages alone when the user has opted to skip
-            // them. This only affects the automatic default; explicitly saved
-            // sites and manual adjustments are unaffected.
-            if (settings.skipDarkSites && isPageDark()) {
-                return 0;
-            }
-            return settings.defaultLevel;
-        }
-        return 0;
+        return resolveLevel({
+            isSaved,
+            savedLevel: isSaved ? await getSavedLevel(domain) : 0,
+            shadeByDefault: settings.shadeByDefault,
+            defaultLevel: settings.defaultLevel,
+            skipDarkSites: settings.skipDarkSites,
+            isDark: isPageDark(),
+        });
     }
 
     /**
@@ -390,14 +344,7 @@
         if (!overlay) {
             return 0;
         }
-        const match = overlay.style.backgroundColor.match(
-            /rgba?\([^)]*,\s*([\d.]+)\s*\)/
-        );
-        if (!match) {
-            return 0;
-        }
-        const opacity = parseFloat(match[1]);
-        return Math.round((opacity / MAX_OPACITY) * 100);
+        return levelFromOverlayColor(overlay.style.backgroundColor);
     }
 
     applyOnLoad();

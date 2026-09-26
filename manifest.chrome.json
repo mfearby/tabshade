@@ -38,7 +38,11 @@
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["browser-polyfill.min.js", "content_scripts/shader.js"],
+      "js": [
+        "browser-polyfill.min.js",
+        "lib/tabshade-core.js",
+        "content_scripts/shader.js"
+      ],
       "run_at": "document_idle"
     }
   ],
