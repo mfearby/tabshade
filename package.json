@@ -1,6 +1,6 @@
 {
   "name": "tabshade",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Firefox extension that shades the current browser tab to reduce its brightness.",
   "private": true,
   "homepage": "https://github.com/mfearby/tabshade",

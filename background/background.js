@@ -65,6 +65,34 @@ browser.tabs.onActivated.addListener((activeInfo) => {
 });
 
 /**
+ * Refresh the badge for whichever tab is currently active. Used when the
+ * background context (re)starts, so the badge is correct even if no tab-switch
+ * event fired to trigger a refresh.
+ */
+async function refreshActiveTabBadge() {
+    try {
+        const [tab] = await browser.tabs.query({
+            active: true,
+            currentWindow: true,
+        });
+        if (tab) {
+            await refreshBadgeForTab(tab.id);
+        }
+    } catch (error) {
+        // No active tab or query unavailable; nothing to refresh.
+    }
+}
+
+/**
+ * On Chrome MV3 the background runs as a non-persistent service worker that is
+ * torn down when idle and restarted on events. When it restarts (browser
+ * launch, extension install/update, or a cold wake) the badge state is lost, so
+ * re-derive it for the active tab. These listeners are harmless on Firefox.
+ */
+browser.runtime.onStartup.addListener(refreshActiveTabBadge);
+browser.runtime.onInstalled.addListener(refreshActiveTabBadge);
+
+/**
  * How much each dim shortcut press changes the shade level.
  */
 const STEP = 5;
