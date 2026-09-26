@@ -211,6 +211,15 @@ function reportExecuteScriptError(error) {
     // Apply the saved theme first so it shows even if shading isn't available.
     applyTheme((await getSettings()).theme);
 
+    // The Preferences button works regardless of whether shading is available
+    // on the current page, so wire it up before attempting script injection.
+    document
+        .querySelector("#open-preferences")
+        .addEventListener("click", () => {
+            browser.runtime.openOptionsPage();
+            window.close();
+        });
+
     try {
         const tab = await getActiveTab();
 
