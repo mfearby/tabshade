@@ -220,6 +220,20 @@ function reportExecuteScriptError(error) {
             window.close();
         });
 
+    // The Chrome build turns the shortcut hint into a link (Chrome can open
+    // chrome://extensions/shortcuts via tabs.create). Firefox can't open
+    // about:addons programmatically, so its hint stays as plain text and this
+    // element is absent there.
+    const shortcutLink = document.querySelector("#shortcut-link");
+    if (shortcutLink) {
+        shortcutLink.addEventListener("click", (event) => {
+            event.preventDefault();
+            const url = event.currentTarget.dataset.url;
+            browser.tabs.create({ url });
+            window.close();
+        });
+    }
+
     try {
         const tab = await getActiveTab();
 

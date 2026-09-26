@@ -38,10 +38,58 @@ its brightness, making pages easier on the eyes in dark environments.
 
 ## Installing for development
 
+### Firefox
+
 1. Open `about:debugging` in Firefox.
 2. Choose **This Firefox**.
 3. Click **Load Temporary Add-on** and select the `manifest.json` file in this
    repository.
+
+### Chrome
+
+Chrome needs the Chrome build (see below) because it uses a service-worker
+background and the `webextension-polyfill`. Once built:
+
+1. Run `npm run build:chrome` to generate `dist/chrome/`.
+2. Open `chrome://extensions` in Chrome.
+3. Enable **Developer mode** (top-right toggle).
+4. Click **Load unpacked** and select the `dist/chrome/` directory.
+
+To rebind the keyboard shortcuts in Chrome, go to
+`chrome://extensions/shortcuts`.
+
+## Building
+
+The extension is written against Firefox's native, promise-based `browser` API.
+Two builds are produced from the same source tree:
+
+| Command                | Output                                             | Notes                                                            |
+| ---------------------- | -------------------------------------------------- | ---------------------------------------------------------------- |
+| `npm run build`        | `web-ext-artifacts/tabshade-<version>.zip`         | Alias for `build:firefox`.                                       |
+| `npm run build:firefox`| `web-ext-artifacts/tabshade-<version>.zip`         | Firefox package. Uses the native `browser` API; no polyfill.     |
+| `npm run build:chrome` | `web-ext-artifacts/tabshade-chrome-<version>.zip`  | Chrome package. Adds the polyfill and a service-worker manifest. |
+
+### How the Chrome build differs
+
+`scripts/build-chrome.mjs` assembles a Chrome package into `dist/chrome/`
+without modifying the shared source. It:
+
+- swaps in `manifest.chrome.json` (a service-worker background, with the
+  Firefox-only `browser_specific_settings` and `theme_icons` keys removed);
+- copies in [`webextension-polyfill`](https://github.com/mozilla/webextension-polyfill)
+  so the `browser.*` calls work on top of Chrome's `chrome.*` APIs;
+- loads the polyfill before every script — in the content script (via the
+  manifest), the popup and options pages (via an injected `<script>` tag), and
+  the service worker (via `importScripts`);
+- rewrites the popup's shortcut hint to point at `chrome://extensions/shortcuts`
+  instead of `about:addons`.
+
+The build fails loudly if the strings it patches (the page `<script>` tags and
+the shortcut hint) are ever renamed, so keep those in mind when editing
+`popup/popup.html` and `options/options.html`.
+
+The `manifest.json` in the repository root is the Firefox manifest; the Chrome
+manifest lives in `manifest.chrome.json`.
 
 ## Icons
 

@@ -3,3 +3,5 @@
 # Node / web-ext
 node_modules/
 web-ext-artifacts/
+# Chrome build output
+dist/

@@ -7,11 +7,14 @@
   "license": "GPL-3.0-or-later",
   "scripts": {
     "lint": "web-ext lint",
-    "build": "web-ext build --overwrite-dest",
+    "build": "npm run build:firefox",
+    "build:firefox": "web-ext build --overwrite-dest",
+    "build:chrome": "node scripts/build-chrome.mjs",
     "start": "web-ext run"
   },
   "devDependencies": {
-    "web-ext": "^8.3.0"
+    "web-ext": "^8.3.0",
+    "webextension-polyfill": "^0.12.0"
   },
   "webExt": {
     "ignoreFiles": [
@@ -20,6 +23,9 @@
       "lint-output.txt",
       "web-ext-artifacts",
       "README.md",
+      "manifest.chrome.json",
+      "scripts",
+      "dist",
       "**/.DS_Store"
     ]
   }
