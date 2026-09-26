@@ -95,13 +95,6 @@ function setDefaultSectionEnabled(enabled) {
 }
 
 /**
- * Show or hide the per-site slider based on the "save this site" checkbox.
- */
-function setSiteSliderVisible(visible) {
-    document.querySelector("#site-level-wrap").classList.toggle("hidden", !visible);
-}
-
-/**
  * Wire up the "Shade by default" toggle and its default-level slider.
  */
 function listenForDefaultControls() {
@@ -132,37 +125,19 @@ function listenForDefaultControls() {
 }
 
 /**
- * Wire up the "Shade this tab (not saved)" slider. This mirrors the keyboard
- * shortcuts: it changes the level applied to the current tab live, but does
- * not persist anything unless the site is already saved (the content script's
- * changeLevel handles that). It resets on reload.
- */
-function listenForTabControls() {
-    const slider = document.querySelector("#tab-level");
-
-    slider.addEventListener("input", async () => {
-        const level = normalizeLevel(slider.value);
-        setSlider("tab-level", "tab-level-value", level);
-        try {
-            await messageActiveTab({ command: "changeLevel", level });
-        } catch (error) {
-            reportError(error);
-        }
-    });
-}
-
-/**
- * Wire up the "Save this site's shade level" checkbox and the per-site slider.
+ * Wire up the per-site slider and the "Save this site's shade level" checkbox.
+ * The slider always adjusts the current tab's level live; if the site is saved,
+ * the content script's changeLevel persists the new level automatically. The
+ * checkbox saves the current level for this site, or removes it when unchecked.
  */
 function listenForSiteControls() {
     const checkbox = document.querySelector("#save-site");
     const slider = document.querySelector("#site-level");
 
     checkbox.addEventListener("change", async () => {
-        setSiteSliderVisible(checkbox.checked);
         try {
             if (checkbox.checked) {
-                // Save the level currently in effect for this tab.
+                // Save the level currently shown on the slider.
                 const level = normalizeLevel(slider.value);
                 await messageActiveTab({ command: "saveSite", level });
             } else {
@@ -177,7 +152,13 @@ function listenForSiteControls() {
         const level = normalizeLevel(slider.value);
         setSlider("site-level", "site-level-value", level);
         try {
-            await messageActiveTab({ command: "saveSite", level });
+            if (checkbox.checked) {
+                // Persist while saved.
+                await messageActiveTab({ command: "saveSite", level });
+            } else {
+                // Preview live without saving.
+                await messageActiveTab({ command: "changeLevel", level });
+            }
         } catch (error) {
             reportError(error);
         }
@@ -207,11 +188,7 @@ async function initControls(tabId) {
     const isDark = !!(state && state.isDark);
     document.querySelector("#dark-detected-hint").classList.toggle("hidden", !isDark);
 
-    // Tab section reflects the level currently applied to this tab.
-    setSlider("tab-level", "tab-level-value", currentLevel);
-
     document.querySelector("#save-site").checked = saved;
-    setSiteSliderVisible(saved);
     setSlider("site-level", "site-level-value", siteLevel);
 }
 
@@ -243,7 +220,6 @@ function reportExecuteScriptError(error) {
         });
 
         listenForDefaultControls();
-        listenForTabControls();
         listenForSiteControls();
         await initControls(tab.id);
     } catch (e) {
