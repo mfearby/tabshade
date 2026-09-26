@@ -1,7 +1,10 @@
 # TabShade
 
-TabShade is a Firefox extension that shades the current browser tab to reduce
-its brightness, making pages easier on the eyes in dark environments.
+TabShade is a browser extension for Firefox and Chrome that shades the current
+browser tab to reduce its brightness, making pages easier on the eyes in dark
+environments.
+
+<img src="screenshot-1.jpg" alt="TabShade in action" width="640">
 
 ## Features
 
