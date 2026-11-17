@@ -137,31 +137,24 @@ async function main() {
         "utf8"
     );
 
-    // 7. Edge shortcuts are not enabled by default, so remove the key-binding
-    //    hint lines from the footer — they'd be misleading until the user
-    //    manually enables them. The rebind link (step 8) stays so they can
-    //    enable the shortcuts if they want them.
-    await replaceInFile(
-        path.join(distDir, "popup", "popup.html"),
-        `<div>Alt+Shift+↑ more dim · Alt+Shift+↓ less dim</div>
-            <div>Alt+Shift+D toggle</div>
-            <div id="shortcut-rebind">`,
-        `<div id="shortcut-rebind">`
-    );
-
-    // 8. Edge can open edge://extensions/shortcuts via tabs.create, so turn
+    // 7. Edge can open edge://extensions/shortcuts via tabs.create, so turn
     //    the plain-text Firefox hint into a clickable link (popup.js wires up
-    //    #shortcut-link when it is present).
+    //    #shortcut-link when it is present). Firefox keeps the plain text
+    //    because it cannot open about:addons programmatically.
     await replaceInFile(
         path.join(distDir, "popup", "popup.html"),
-        `Rebind in about:addons → ⚙ → Manage Extension Shortcuts`,
-        `Rebind at
+        `<div id="shortcut-rebind">
+                Rebind in about:addons → ⚙ → Manage Extension Shortcuts
+            </div>`,
+        `<div id="shortcut-rebind">
+                Rebind at
                 <a
                     href="#"
                     id="shortcut-link"
                     data-url="edge://extensions/shortcuts"
                     >edge://extensions/shortcuts</a
-                >`
+                >
+            </div>`
     );
 
     // 8. Zip the package. Use the platform `zip` tool, zipping the dist
